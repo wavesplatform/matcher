@@ -40,7 +40,8 @@ class MatcherScriptRunnerSpecification extends WavesExtSuiteBase with EitherValu
     useNewPowPrecision: Boolean,
     checkEstimatorSumOverflow: Boolean,
     newEvaluatorMode: Boolean,
-    checkWeakPk: Boolean
+    checkWeakPk: Boolean,
+    fixBigScript: Boolean
   ): Either[String, Terms.EVALUATED] =
     MatcherScriptRunner(
       script,
@@ -51,13 +52,22 @@ class MatcherScriptRunnerSpecification extends WavesExtSuiteBase with EitherValu
       useNewPowPrecision,
       checkEstimatorSumOverflow,
       newEvaluatorMode,
-      checkWeakPk
+      checkWeakPk,
+      fixBigScript
     )
       .leftMap(_.message)
 
   "dApp sunny day" in {
-    List(false, true).combinations(6).foreach { params =>
-      val List(useCorrectScriptVersion, fixUnicodeFunctions, useNewPowPrecision, checkEstimatorSumOverflow, newEvaluatorMode, checkWeakPk) =
+    List(false, true).combinations(7).foreach { params =>
+      val List(
+        useCorrectScriptVersion,
+        fixUnicodeFunctions,
+        useNewPowPrecision,
+        checkEstimatorSumOverflow,
+        newEvaluatorMode,
+        checkWeakPk,
+        fixBigScript
+      ) =
         params: @unchecked
       run(
         dAppScriptSunny,
@@ -66,14 +76,23 @@ class MatcherScriptRunnerSpecification extends WavesExtSuiteBase with EitherValu
         useNewPowPrecision,
         checkEstimatorSumOverflow,
         newEvaluatorMode,
-        checkWeakPk
+        checkWeakPk,
+        fixBigScript
       ).explicitGet() shouldBe Terms.FALSE
     }
   }
 
   "Blockchain functions are disabled in dApp (isSynchronousCallsActivated = false)" in {
-    List(false, true).combinations(3).foreach { params =>
-      val List(useCorrectScriptVersion, fixUnicodeFunctions, useNewPowPrecision, checkEstimatorSumOverflow, newEvaluatorMode, checkWeakPk) =
+    List(false, true).combinations(4).foreach { params =>
+      val List(
+        useCorrectScriptVersion,
+        fixUnicodeFunctions,
+        useNewPowPrecision,
+        checkEstimatorSumOverflow,
+        newEvaluatorMode,
+        checkWeakPk,
+        fixBigScript
+      ) =
         params: @unchecked
       run(
         dAppScriptBlockchain,
@@ -82,7 +101,8 @@ class MatcherScriptRunnerSpecification extends WavesExtSuiteBase with EitherValu
         useNewPowPrecision,
         checkEstimatorSumOverflow,
         newEvaluatorMode,
-        checkWeakPk
+        checkWeakPk,
+        fixBigScript
       ) should produce(
         "An access to <getBoolean(addressOrAlias: Address|Alias, key: String): Boolean|Unit> is denied"
       )

@@ -6,6 +6,7 @@ import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.error.AccountScriptReturnedError
+import com.wavesplatform.dex.it.docker.{DexContainer, WavesNodeContainer}
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.model.ExecutionParamsInProofs
 import com.wavesplatform.it.MatcherSuiteBase
@@ -126,6 +127,12 @@ final class OrderExecutedDataInProofsTestSuite extends MatcherSuiteBase {
     proofs(2).encoded() shouldBe priceProof.base58
   }
 
+  override protected lazy val dex1: DexContainer =
+    createDex(name = "dex-1", lpAccounts = Seq(alice.publicKey, bob.publicKey))
+
+  override protected lazy val wavesNode1: WavesNodeContainer =
+    createWavesNode(name = "waves-1", lpAccounts = Seq(alice.publicKey, bob.publicKey))
+
   override def beforeAll(): Unit = {
     wavesNode1.start()
     broadcastAndAwait(IssueUsdnTx)
@@ -142,17 +149,9 @@ final class OrderExecutedDataInProofsTestSuite extends MatcherSuiteBase {
        |  price-assets = [ "$UsdnId", "WAVES" ]
        |  pass-execution-parameters {
        |    since-offset = 3
-       |    for-accounts = [${alice.publicKey}, ${bob.publicKey}]
        |  }
        |}""".stripMargin
   )
-
-  override protected def wavesNodeInitialSuiteConfig: Config = ConfigFactory
-    .parseString(
-      s"""
-         |waves.dex.order-script-validation.allowed-blockchain-state-accounts=["${alice.publicKey.base58}", "${bob.publicKey.base58}"]
-         |""".stripMargin
-    )
 
   /*
   {-# STDLIB_VERSION 5 #-}

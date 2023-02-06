@@ -57,6 +57,36 @@ object Actions {
 
   private val backend = HttpURLConnectionBackend()
 
+  def clearStaleOrderbooks(args: Args, matcherSettings: MatcherSettings): Unit = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    cli.log(
+      s"""
+         |Passed arguments:
+         |  DEX config path : ${args.configPath}
+         |""".stripMargin
+    )
+
+    withLevelDb(matcherSettings.dataDirectory) { db =>
+      val apdb = AssetPairsDb.levelDb(db)
+      val obdb = OrderBookSnapshotDb.levelDb(db)
+      val apb = new AssetPairBuilder(matcherSettings, null, matcherSettings.blacklistedAssets)
+
+      val pairs = apdb.all()
+      val validPairs = pairs.flatMap(apb.quickValidateAssetPair(_).toOption)
+
+      val emptySnapshots = obdb.iterateSnapshots((pair, sn) => validPairs.contains(pair) && sn.asks.isEmpty && sn.bids.isEmpty)
+      emptySnapshots.keys.foreach { pair =>
+        apdb.remove(pair)
+        obdb.delete(pair)
+      }
+
+      println(s"Removed ${emptySnapshots.size} orderbook snapshots")
+
+      val leftPairsSize = obdb.iterateSnapshotsByPair(validPairs.contains)
+      println(s"Left ${leftPairsSize.size} valid orderbooks")
+    }
+  }
+
   // noinspection ScalaStyle
   def checkOrdersForTxV3Compat(args: Args, matcherSettings: MatcherSettings): Unit = {
     import scala.concurrent.ExecutionContext.Implicits.global
@@ -500,7 +530,7 @@ object Actions {
 
       val pairs = apdb.all()
       val validPairs = pairs.flatMap(apb.quickValidateAssetPair(_).toOption)
-      val snapshots = obdb.iterateSnapshots(validPairs.contains)
+      val snapshots = obdb.iterateSnapshotsByPair(validPairs.contains)
       val offsets = obdb.iterateOffsets(validPairs.contains)
       val lowestOffset = validPairs.map { pair =>
         pair -> offsets.get(pair).zip(snapshots.get(pair))

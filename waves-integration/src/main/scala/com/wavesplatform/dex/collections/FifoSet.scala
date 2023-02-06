@@ -3,6 +3,7 @@ package com.wavesplatform.dex.collections
 import scala.collection.mutable
 
 sealed trait FifoSet[T] {
+
   def contains(x: T): Boolean
 
   /**
@@ -10,14 +11,17 @@ sealed trait FifoSet[T] {
    */
   def append(x: T): Boolean
 
+  def remove(x: T): Boolean
+
   def clear(): Unit
 }
 
 // DEX-1044
 private case class LimitedFifoSet[T] private (elements: mutable.LinkedHashSet[T], capacity: Int) extends FifoSet[T] {
-  def contains(id: T): Boolean = elements.contains(id)
 
-  def append(id: T): Boolean =
+  override def contains(id: T): Boolean = elements.contains(id)
+
+  override def append(id: T): Boolean =
     if (contains(id)) false
     else {
       elements.add(id)
@@ -25,7 +29,10 @@ private case class LimitedFifoSet[T] private (elements: mutable.LinkedHashSet[T]
       true
     }
 
-  def clear(): Unit =
+  override def remove(id: T): Boolean =
+    elements.remove(id)
+
+  override def clear(): Unit =
     elements.clear()
 
 }

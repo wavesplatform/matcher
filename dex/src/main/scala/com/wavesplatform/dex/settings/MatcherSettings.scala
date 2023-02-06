@@ -13,14 +13,13 @@ import com.wavesplatform.dex.model.AssetPairQuickValidator
 import com.wavesplatform.dex.model.OrderValidator.exchangeTransactionCreationFee
 import com.wavesplatform.dex.settings.MatcherSettings.PartialOrderFeeSettings
 import com.wavesplatform.dex.settings.OrderFeeSettings._
-import com.wavesplatform.dex.settings.OrderFeeSettings.CompositeSettings._
 import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
 import com.wavesplatform.dex.settings.utils.{validationOf, ConfigReaders, RawFailureReason}
 import com.wavesplatform.dex.tool.ComparisonTool
+import pureconfig.generic.auto._
 import pureconfig.ConfigReader
 import pureconfig.configurable.genericMapReader
 import pureconfig.error.{ConfigReaderFailures, ExceptionThrown, FailureReason}
-import pureconfig.generic.auto._
 import pureconfig.generic.error.UnexpectedValueForFieldCoproductHint
 import pureconfig.generic.semiauto
 import pureconfig.module.cats.nonEmptyListReader
@@ -73,7 +72,9 @@ case class MatcherSettings(
   comparisonTool: ComparisonTool.Settings,
   cli: CliSettings,
   secureKeys: Set[String],
-  lpAccounts: LpAccountsSettings
+  lpAccounts: LpAccountsSettings,
+  redis: RedisSettings,
+  redisInternalClientHandlerActor: RedisInternalClientHandlerActorSettings
 ) {
 
   val recoverOrderHistory = !new File(dataDirectory).exists()

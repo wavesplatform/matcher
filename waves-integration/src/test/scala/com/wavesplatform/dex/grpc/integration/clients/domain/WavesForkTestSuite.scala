@@ -116,6 +116,67 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
           fork.withBlock(microBlock) should matchTo[Status](Status.NotResolved(expectedUpdatedFork))
         }
 
+        "after the key block with the same height (same blocks)" in {
+          val fork = WavesFork(
+            mkChain(Vector(block2, block1), 98),
+            mkChain(Vector(block2, block1), 98)
+          )
+
+          val microBlock = WavesBlock(
+            ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 1))),
+            reference = block2.ref.id,
+            changes = BlockchainBalance(
+              regular = Map(bob -> Map(usd -> 31)),
+              outgoingLeasing = Map(bob -> 10L)
+            ),
+            tpe = WavesBlock.Type.MicroBlock,
+            confirmedTxs = mkTransactionWithChangesMap(10)
+          )
+
+          fork.withBlock(microBlock) should matchTo[Status](Status.NotResolved(
+            WavesFork(
+              mkChain(Vector(block2, block1), 98),
+              mkChain(Vector(microBlock, block2, block1), 98)
+            )
+          ))
+        }
+
+        "after the micro block with the same height (same blocks and micro blocks)" in {
+          val microBlock1 = WavesBlock(
+            ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 2))),
+            reference = block1.ref.id,
+            changes = BlockchainBalance(
+              regular = Map(alice -> Map(usd -> 69)),
+              outgoingLeasing = Map(bob -> 2L)
+            ),
+            tpe = WavesBlock.Type.MicroBlock,
+            confirmedTxs = mkTransactionWithChangesMap(10)
+          )
+
+          val microBlock2 = WavesBlock(
+            ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 3))),
+            reference = microBlock1.ref.id,
+            changes = BlockchainBalance(
+              regular = Map(bob -> Map(Waves -> 11)),
+              outgoingLeasing = Map(alice -> 9L)
+            ),
+            tpe = WavesBlock.Type.MicroBlock,
+            confirmedTxs = mkTransactionWithChangesMap(11)
+          )
+
+          val fork = WavesFork(
+            mkChain(Vector(microBlock1, block1), 99),
+            mkChain(Vector(microBlock1, block1), 99)
+          )
+
+          fork.withBlock(microBlock2) should matchTo[Status](Status.NotResolved(
+            WavesFork(
+              mkChain(Vector(microBlock1, block1), 99),
+              mkChain(Vector(microBlock2, microBlock1, block1), 99)
+            )
+          ))
+        }
+
         "an existed micro block on the same chain" in {
           val microBlock1 = WavesBlock(
             ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 2))),
@@ -140,6 +201,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
 
           fork.withBlock(microBlock1) should matchTo[Status](Status.NotResolved(expectedUpdatedFork))
         }
+
       }
 
       "Resolved" - {
@@ -173,125 +235,55 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
           ))
         }
 
-        "on a micro block" - {
-          "after the key block with the same height (same blocks)" in {
-            val fork = WavesFork(
-              mkChain(Vector(block2, block1), 98),
-              mkChain(Vector(block2, block1), 98)
-            )
+        "on a micro block with a higher height" in {
+          val microBlock1 = WavesBlock(
+            ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 2))),
+            reference = block1.ref.id,
+            changes = BlockchainBalance(
+              regular = Map(alice -> Map(usd -> 69)),
+              outgoingLeasing = Map(bob -> 2L)
+            ),
+            tpe = WavesBlock.Type.MicroBlock,
+            confirmedTxs = (10 to 12).toList.foldMapK(mkTransactionWithChangesMap)
+          )
 
-            val microBlock = WavesBlock(
-              ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 1))),
-              reference = block2.ref.id,
-              changes = BlockchainBalance(
-                regular = Map(bob -> Map(usd -> 31)),
-                outgoingLeasing = Map(bob -> 10L)
-              ),
-              tpe = WavesBlock.Type.MicroBlock,
-              confirmedTxs = mkTransactionWithChangesMap(10)
-            )
+          val block2B = WavesBlock(
+            ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 0))),
+            reference = block1.ref.id,
+            changes = BlockchainBalance(
+              regular = Map(bob -> Map(usd -> 35)),
+              outgoingLeasing = Map.empty
+            ),
+            tpe = WavesBlock.Type.FullBlock,
+            confirmedTxs = mkTransactionWithChangesMap(2) ++
+              mkTransactionWithChangesMap(11) // migrated from microBlock1
+          )
 
-            fork.withBlock(microBlock) should matchTo[Status](Status.Resolved(
-              activeChain = mkChain(Vector(microBlock, block2, block1), 98),
-              newChanges = BlockchainBalance(
-                regular = Map(bob -> Map(usd -> 31)),
-                outgoingLeasing = Map(bob -> 10L)
-              ),
-              lostDiffIndex = Monoid.empty[DiffIndex],
-              lostTxIds = Map.empty,
-              newConfirmedTxs = microBlock.confirmedTxs,
-              commonTxIds = Set.empty
-            ))
-          }
+          val microBlock2 = WavesBlock(
+            ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 1))),
+            reference = block2B.ref.id,
+            changes = BlockchainBalance(
+              regular = Map(bob -> Map(Waves -> 11)),
+              outgoingLeasing = Map(alice -> 9L)
+            ),
+            tpe = WavesBlock.Type.MicroBlock,
+            confirmedTxs = mkTransactionWithChangesMap(100) ++
+              mkTransactionWithChangesMap(12) // migrated from microBlock1
+          )
 
-          "after the key block with the higher height" in {
-            val microBlock1 = WavesBlock(
-              ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 2))),
-              reference = block1.ref.id,
-              changes = BlockchainBalance(
-                regular = Map(alice -> Map(usd -> 69)),
-                outgoingLeasing = Map(bob -> 2L)
-              ),
-              tpe = WavesBlock.Type.MicroBlock,
-              confirmedTxs = (10 to 12).toList.foldMapK(mkTransactionWithChangesMap)
-            )
+          val fork = WavesFork(
+            mkChain(Vector(microBlock1, block1), 99),
+            mkChain(Vector(block2B, block1), 98)
+          )
 
-            val block2B = WavesBlock(
-              ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 0))),
-              reference = block1.ref.id,
-              changes = BlockchainBalance(
-                regular = Map(bob -> Map(usd -> 35)),
-                outgoingLeasing = Map.empty
-              ),
-              tpe = WavesBlock.Type.FullBlock,
-              confirmedTxs = mkTransactionWithChangesMap(2) ++
-                mkTransactionWithChangesMap(11) // migrated from microBlock1
-            )
-
-            val microBlock2 = WavesBlock(
-              ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 1))),
-              reference = block2B.ref.id,
-              changes = BlockchainBalance(
-                regular = Map(bob -> Map(Waves -> 11)),
-                outgoingLeasing = Map(alice -> 9L)
-              ),
-              tpe = WavesBlock.Type.MicroBlock,
-              confirmedTxs = mkTransactionWithChangesMap(100) ++
-                mkTransactionWithChangesMap(12) // migrated from microBlock1
-            )
-
-            val fork = WavesFork(
-              mkChain(Vector(microBlock1, block1), 99),
-              mkChain(Vector(block2B, block1), 98)
-            )
-
-            fork.withBlock(microBlock2) should matchTo[Status](Status.Resolved(
-              activeChain = mkChain(Vector(microBlock2, block2B, block1), 98),
-              newChanges = block2B.changes |+| microBlock2.changes,
-              lostDiffIndex = microBlock1.diffIndex,
-              lostTxIds = mkTransactionWithChangesMap(10), // from microBlock1
-              newConfirmedTxs = List(2, 100).foldMapK(mkTransactionWithChangesMap),
-              commonTxIds = Set(mkTxId(11), mkTxId(12))
-            ))
-          }
-
-          "after the micro block with the same height (same blocks and micro blocks)" in {
-            val microBlock1 = WavesBlock(
-              ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 2))),
-              reference = block1.ref.id,
-              changes = BlockchainBalance(
-                regular = Map(alice -> Map(usd -> 69)),
-                outgoingLeasing = Map(bob -> 2L)
-              ),
-              tpe = WavesBlock.Type.MicroBlock,
-              confirmedTxs = mkTransactionWithChangesMap(10)
-            )
-
-            val microBlock2 = WavesBlock(
-              ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 3))),
-              reference = microBlock1.ref.id,
-              changes = BlockchainBalance(
-                regular = Map(bob -> Map(Waves -> 11)),
-                outgoingLeasing = Map(alice -> 9L)
-              ),
-              tpe = WavesBlock.Type.MicroBlock,
-              confirmedTxs = mkTransactionWithChangesMap(11)
-            )
-
-            val fork = WavesFork(
-              mkChain(Vector(microBlock1, block1), 99),
-              mkChain(Vector(microBlock1, block1), 99)
-            )
-
-            fork.withBlock(microBlock2) should matchTo[Status](Status.Resolved(
-              activeChain = mkChain(Vector(microBlock2, microBlock1, block1), 99),
-              newChanges = microBlock2.changes,
-              lostDiffIndex = Monoid.empty[DiffIndex],
-              lostTxIds = Map.empty,
-              newConfirmedTxs = microBlock2.confirmedTxs,
-              commonTxIds = Set.empty
-            ))
-          }
+          fork.withBlock(microBlock2) should matchTo[Status](Status.Resolved(
+            activeChain = mkChain(Vector(microBlock2, block2B, block1), 98),
+            newChanges = block2B.changes |+| microBlock2.changes,
+            lostDiffIndex = microBlock1.diffIndex,
+            lostTxIds = mkTransactionWithChangesMap(10), // from microBlock1
+            newConfirmedTxs = List(2, 100).foldMapK(mkTransactionWithChangesMap),
+            commonTxIds = Set(mkTxId(11), mkTxId(12))
+          ))
         }
       }
     }

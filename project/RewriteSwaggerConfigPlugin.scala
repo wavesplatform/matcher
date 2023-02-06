@@ -37,7 +37,7 @@ object RewriteSwaggerConfigPlugin extends AutoPlugin {
                 .children()
                 .asScala
                 .find { el =>
-                  el.tagName() == "script" && el.html().contains("SwaggerUIBundle")
+                  el.tagName() == "script" && el.attr("src") == "./swagger-initializer.js"
                 } match {
                 case None => throw new RuntimeException("Can't patch script in index.html")
                 case Some(el) =>
@@ -56,6 +56,8 @@ window.ui = ui;
 """
                   // Careful! ^ will be inserted as one-liner
                   el.text(update)
+                  el.removeAttr("src")
+                  el.attr("type", "text/javascript")
               }
 
               Files.createDirectories(outputFile.getParentFile.toPath)

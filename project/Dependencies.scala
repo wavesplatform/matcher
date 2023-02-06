@@ -51,6 +51,7 @@ object Dependencies {
     val testContainersPostgres = "1.16.0"
     val testContainersKafka = "1.16.0"
     val testContainersToxiProxy = "1.16.0"
+    val testContainersRedis = "1.6.2"
 
     val jackson = "2.10.0"
     val playJson = "2.9.2"
@@ -59,7 +60,7 @@ object Dependencies {
     val kafka = "2.8.0"
 
     val swagger = "1.4.0"
-    val swaggerUi = "3.51.2"
+    val swaggerUi = "4.15.5"
     val jaxbApi = "2.3.1"
 
     val scorexCrypto = "2.1.10"
@@ -83,6 +84,8 @@ object Dependencies {
     val scalaPbJson = "0.9.3" // updating causes scalapb version conflicts in waves-integration-it tests (class scalapb/Message not found)
 
     val web3jCore = "4.9.2"
+
+    val redisson = "3.13.0"
   }
 
   private def akkaModule(module: String, version: String): ModuleID = "com.typesafe.akka" %% module % version
@@ -152,6 +155,7 @@ object Dependencies {
   private val sttpAsyncHttpClient = sttpClientModule("async-http-client-backend-future")
   private val allureScalaTest = "io.qameta.allure" %% "allure-scalatest" % Version.allureScalaTest
   private val jaxbApi = "javax.xml.bind" % "jaxb-api" % Version.jaxbApi
+  private val redisson = "org.redisson" % "redisson" % Version.redisson
 
   private[this] val levelDBJNA =
     Seq(
@@ -179,7 +183,8 @@ object Dependencies {
   private val testContainers: Seq[ModuleID] = Seq(
     "com.dimafeng" %% "testcontainers-scala" % Version.testContainers,
     "org.testcontainers" % "postgresql" % Version.testContainersPostgres,
-    "org.testcontainers" % "kafka" % Version.testContainersKafka
+    "org.testcontainers" % "kafka" % Version.testContainersKafka,
+    "com.redis.testcontainers" % "testcontainers-redis" % Version.testContainersRedis
   )
 
   private val testKit: Seq[ModuleID] = Seq(
@@ -266,7 +271,8 @@ object Dependencies {
       wavesJ,
       web3jCore,
       betterMonadicFor,
-      iq80leveldb
+      iq80leveldb,
+      redisson
     ) ++ pureConfig ++ enumeratum ++ testKit ++ quill ++ monocle ++ levelDBJNA
 
     lazy val dexLoad: Seq[ModuleID] = Seq(diffx) ++ pureConfig ++ silencer

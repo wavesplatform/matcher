@@ -62,7 +62,6 @@ object WsInternalBroadcastActor {
               context.log.info(s"[${clientRef.path.name}] unsubscribed")
               default(state.updateSubscriptions(_ - clientRef.unsafeUpcast[WsInternalClientHandlerActor.Message]))
           }
-
       default(State(none, Set.empty, Cancellable.alreadyCancelled))
     }
 

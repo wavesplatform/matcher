@@ -1,9 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.clients.combined
 
 import cats.instances.future._
-import cats.instances.set._
 import cats.syntax.contravariantSemigroupal._
-import cats.syntax.group._
 import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.wavesplatform.dex.collections.ListOps.ListOfMapsOps
@@ -86,7 +84,8 @@ class CombinedWavesBlockchainClient(
           }
           if (x.requestNextBlockchainEvent) bClient.blockchainEvents.requestNext()
           requestBalances(x.requestBalances)
-          val updatedPessimistic = processUtxEvents(x.utxUpdate) // TODO DEX-1045 Do we need to filter out known transactions (WavesChain)?
+          val updatedPessimistic =
+            pessimisticPortfolios.processUtxUpdate(x.utxUpdate) // TODO DEX-1045 Do we need to filter out known transactions (WavesChain)?
           val changedAddresses = x.updatedBalances.regular.keySet ++ x.updatedBalances.outgoingLeasing.keySet ++ updatedPessimistic
           val updatedFinalBalances = changedAddresses
             .map { address =>
@@ -140,14 +139,6 @@ class CombinedWavesBlockchainClient(
 
     }
     .doOnError(e => Task(log.error("Got an error in the combined stream", e)))
-
-  // TODO DEX-1013
-  private def processUtxEvents(utxUpdate: UtxUpdate): Set[Address] =
-    if (utxUpdate.resetCaches) pessimisticPortfolios.replaceWith(utxUpdate.unconfirmedTxs.values.toSeq)
-    else
-      pessimisticPortfolios.addPending(utxUpdate.unconfirmedTxs.values.toSeq) |+|
-      pessimisticPortfolios.processConfirmed(utxUpdate.confirmedTxs.keySet)._1 |+|
-      pessimisticPortfolios.removeFailed(utxUpdate.failedTxs.keySet)
 
   // TODO DEX-1015
   private def requestBalances(x: DiffIndex): Unit =

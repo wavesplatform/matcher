@@ -151,48 +151,51 @@ object CombinedStreamActor {
       scheduleAndWaitForContinue()
     }
 
-    def starting(utxEventsStarted: Boolean, blockchainUpdatesStarted: Boolean): Behavior[Command] = {
+    def startingInternal(utxEventsStarted: Boolean, blockchainUpdatesStarted: Boolean, stash: StashBuffer[Command]): Behavior[Command] = {
       context.log.info(s"Status: starting(utx=$utxEventsStarted, bu=$blockchainUpdatesStarted)")
       status.onNext(Status.Starting(blockchainUpdates = blockchainUpdatesStarted, utxEvents = utxEventsStarted))
-      Behaviors.stashWithCtxPropagation[Command](Int.MaxValue) { stash =>
-        Behaviors.receiveMessagePartial[Command] {
-          mkPartial {
-            case Command.ProcessUtxSystemEvent(SystemEvent.BecameReady) =>
-              if (utxEventsStarted)
-                // We should only log the suspicious behavior, see closing:Command.ProcessUtxSystemEvent(SystemEvent.Closed) above.
-                logAndKeepBehavior("utx has already started")
-              else if (blockchainUpdatesStarted) {
-                context.log.warn("Unexpected state: bu has already started")
-                becomeWorking(stash)
-              } else {
-                blockchainUpdates.startFrom(processedHeight.get() + 1)
-                starting(utxEventsStarted = true, blockchainUpdatesStarted)
-              }
+      Behaviors.receiveMessagePartial[Command] {
+        mkPartial {
+          case Command.ProcessUtxSystemEvent(SystemEvent.BecameReady) =>
+            if (utxEventsStarted)
+              // We should only log the suspicious behavior, see closing:Command.ProcessUtxSystemEvent(SystemEvent.Closed) above.
+              logAndKeepBehavior("utx has already started")
+            else if (blockchainUpdatesStarted) {
+              context.log.warn("Unexpected state: bu has already started")
+              becomeWorking(stash)
+            } else {
+              blockchainUpdates.startFrom(processedHeight.get() + 1)
+              startingInternal(utxEventsStarted = true, blockchainUpdatesStarted, stash)
+            }
 
-            case Command.ProcessBlockchainUpdatesSystemEvent(SystemEvent.BecameReady) =>
-              if (blockchainUpdatesStarted)
-                // We should only log the suspicious behavior, see closing:Command.ProcessUtxSystemEvent(SystemEvent.Closed) above.
-                logAndKeepBehavior("bu has already started")
-              else if (utxEventsStarted) becomeWorking(stash)
-              else starting(utxEventsStarted, blockchainUpdatesStarted = true)
+          case Command.ProcessBlockchainUpdatesSystemEvent(SystemEvent.BecameReady) =>
+            if (blockchainUpdatesStarted)
+              // We should only log the suspicious behavior, see closing:Command.ProcessUtxSystemEvent(SystemEvent.Closed) above.
+              logAndKeepBehavior("bu has already started")
+            else if (utxEventsStarted) becomeWorking(stash)
+            else startingInternal(utxEventsStarted, blockchainUpdatesStarted = true, stash)
 
-            case Command.ProcessUtxSystemEvent(SystemEvent.Stopped) =>
-              // We don't need to stop blockchain updates, because we start it
-              // only after receiving SystemEvent.BecameReady from UTX Stream
-              stash.clear()
-              startWithoutRollback()
+          case Command.ProcessUtxSystemEvent(SystemEvent.Stopped) =>
+            // We don't need to stop blockchain updates, because we start it
+            // only after receiving SystemEvent.BecameReady from UTX Stream
+            stash.clear()
+            startWithoutRollback()
 
-            case Command.ProcessBlockchainUpdatesSystemEvent(SystemEvent.Stopped) =>
-              utxEvents.stop()
-              stopping(utxEventsStopped = false, blockchainUpdatesStopped = true)
+          case Command.ProcessBlockchainUpdatesSystemEvent(SystemEvent.Stopped) =>
+            utxEvents.stop()
+            stopping(utxEventsStopped = false, blockchainUpdatesStopped = true)
 
-            case cmd @ (Command.ProcessUtxEvent(_) | Command.ProcessBlockchainUpdatesEvent(_)) =>
-              stash.stash(cmd)
-              Behaviors.same
-          }.orElse(onClosedOrRestart)
-        }
+          case cmd @ (Command.ProcessUtxEvent(_) | Command.ProcessBlockchainUpdatesEvent(_)) =>
+            stash.stash(cmd)
+            Behaviors.same
+        }.orElse(onClosedOrRestart)
       }
     }
+
+    def starting(utxEventsStarted: Boolean, blockchainUpdatesStarted: Boolean): Behavior[Command] =
+      Behaviors.stashWithCtxPropagation[Command](Int.MaxValue) { stash =>
+        startingInternal(utxEventsStarted, blockchainUpdatesStarted, stash)
+      }
 
     def working: Behavior[Command] = {
       context.log.info("Status: working")

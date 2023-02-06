@@ -8,6 +8,7 @@ case class UtxUpdate(
   unconfirmedTxs: Map[ByteString, UtxTransaction] = Map.empty,
   confirmedTxs: Map[ByteString, TransactionWithChanges] = Map.empty,
   failedTxs: Map[ByteString, UtxTransaction] = Map.empty,
+  lostTxs: Map[ByteString, TransactionWithChanges] = Map.empty,
   resetCaches: Boolean = false
 ) {
   override def toString: String = s"UtxUpdate(u=${unconfirmedTxs.size}, fgtx=${confirmedTxs.size}, fltx=${failedTxs.size}, r=$resetCaches)"
@@ -23,6 +24,7 @@ object UtxUpdate {
       unconfirmedTxs = removeDone(x.unconfirmedTxs, y) ++ removeDone(y.unconfirmedTxs, x),
       confirmedTxs = x.confirmedTxs ++ y.confirmedTxs,
       failedTxs = x.failedTxs ++ y.failedTxs,
+      lostTxs = x.lostTxs ++ y.lostTxs,
       resetCaches = x.resetCaches || y.resetCaches
     )
 

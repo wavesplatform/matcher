@@ -135,7 +135,7 @@ inConfig(Linux)(
 inConfig(Debian)(
   Seq(
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
-    debianPackageDependencies += "adoptopenjdk-11-hotspot",
+    debianPackageDependencies += "openjdk-11-jdk-headless",
     serviceAutostart := false,
     maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm")),
     linuxPackageMappings ++= {

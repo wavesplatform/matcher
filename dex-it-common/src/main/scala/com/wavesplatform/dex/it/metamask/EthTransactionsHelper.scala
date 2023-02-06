@@ -1,4 +1,4 @@
-package com.wavesplatform.it.sync.metamask
+package com.wavesplatform.dex.it.metamask
 
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset

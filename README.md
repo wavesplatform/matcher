@@ -1,4 +1,3 @@
-
 # Matcher
 
 <p>
@@ -537,3 +536,4 @@ A new release is tagged to the commit in a `master` branch. If there is a bug:
 
   3. Click on publish.
   4. Update the errors' documentation in Wiki.
+

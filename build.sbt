@@ -162,13 +162,6 @@ inScope(Global)(
 git.useGitDescribe := true
 git.uncommittedSignifier := Some("DIRTY")
 
-// FIX https://github.com/sbt/sbt-git/issues/161#issuecomment-469342173
-git.gitDescribedVersion := git.gitDescribedVersion { _ =>
-  import scala.sys.process._
-  val nativeGitDescribeResult = s"git describe --tags".!!.trim
-  git.defaultTagByVersionStrategy(nativeGitDescribeResult)
-}.value
-
 // root project settings
 enablePlugins(ReleasePlugin)
 

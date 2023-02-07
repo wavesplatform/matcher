@@ -1,10 +1,10 @@
 package com.wavesplatform.dex.grpc.integration.clients.domain.portfolio
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
-
 import com.google.protobuf.ByteString
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.grpc.integration.clients.domain.UtxUpdate
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.Implicits._
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios.Settings
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
@@ -47,6 +47,15 @@ class SynchronizedPessimisticPortfolios(settings: Settings) {
   }
 
   def getAggregated(address: Address): Map[Asset, Long] = read(orig.getAggregated(address))
+
+  def processUtxUpdate(utxUpdate: UtxUpdate): Set[Address] = write {
+    orig.processUtxUpdate(
+      unconfirmedTxs = utxUpdate.unconfirmedTxs.values.toSeq.map(x => PessimisticTransaction(x.id, x.pessimisticPortfolios)),
+      confirmedTxs = utxUpdate.confirmedTxs.keys.toSeq,
+      failedTxs = utxUpdate.failedTxs.values.toSeq.map(x => PessimisticTransaction(x.id, x.pessimisticPortfolios)),
+      resetCaches = utxUpdate.resetCaches
+    )
+  }
 
 }
 

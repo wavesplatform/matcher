@@ -1,9 +1,11 @@
 package com.wavesplatform.dex.grpc.integration
 
+import com.wavesplatform.account.Address
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.TxValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 
 import java.io.{PrintWriter, StringWriter}
 import scala.annotation.tailrec
@@ -18,11 +20,11 @@ package object error {
   }
 
   @tailrec
-  def canRetry(x: ValidationError): Boolean = x match {
+  def canRetry(x: ValidationError, tx: Option[ExchangeTransaction], lpAccounts: Set[Address]): Boolean = x match {
     case x: GenericError
         if x.err == "Transaction pool bytes size limit is reached"
           || x.err == "Transaction pool size limit is reached"
-          || x.err.startsWith("There are not enough connections with peers") => true
+          || x.err.contains("There are not enough connections with peers") => true
 
     // Could happen when:
     // 1. One transaction is sent multiple times in parallel
@@ -32,13 +34,19 @@ package object error {
 
     //error message was taken from:
     //https://github.com/wavesplatform/Waves/blob/master/node/src/main/scala/com/wavesplatform/state/diffs/ExchangeTransactionDiff.scala#L169-L171
-    case x: TxValidationError.OrderValidationError if x.err.startsWith("Too much") => true
+    case x: TxValidationError.OrderValidationError if x.err.contains("Too much") => true
 
     //error message was taken from:
     //https://github.com/wavesplatform/Waves/blob/master/node/src/main/scala/com/wavesplatform/state/diffs/BalanceDiffValidation.scala#L49
-    case TxValidationError.AccountBalanceError(errs) if errs.values.exists(_.startsWith("negative asset balance")) => true
+    case TxValidationError.AccountBalanceError(errs) if errs.values.exists(_.contains("negative asset balance")) => true
 
-    case TransactionValidationError(cause, _) => canRetry(cause)
+    //fix for LP
+    case x: TxValidationError.ScriptExecutionError
+        if x.message.contains("order validation failed") &&
+          tx.map(_.order1.senderAddress).exists(lpAccounts.contains) ||
+          tx.map(_.order2.senderAddress).exists(lpAccounts.contains) => true
+
+    case TransactionValidationError(cause, _) => canRetry(cause, tx, lpAccounts)
 
     case _ => false
   }

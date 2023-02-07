@@ -51,6 +51,8 @@ import com.wavesplatform.dex.logs.SystemInformationReporter
 import com.wavesplatform.dex.model.{AcceptedOrder, AssetPairBuilder, ExchangeTransactionCreator, ExecutionParamsInProofs, Fee, MatchTimestamp, OrderValidator, ValidationStages}
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 import com.wavesplatform.dex.queue._
+import com.wavesplatform.dex.redis.RedisClient
+import com.wavesplatform.dex.redis.actors.RedisInternalClientHandlerActor
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import com.wavesplatform.dex.time.NTP
@@ -173,8 +175,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     settings.orderV4StartOffset,
     hasMatcherAccountScript,
     assetsCache.cached.unsafeGetHasScript, // Should be in the cache, because assets decimals are required during an order book creation
-    (offsetOpt, sender) =>
-      offsetOpt.exists(_ > settings.passExecutionParameters.sinceOffset) && settings.passExecutionParameters.forAccounts.contains(sender),
+    (offsetOpt, sender) => offsetOpt.exists(_ > settings.passExecutionParameters.sinceOffset) && settings.lpAccounts.publicKeys.contains(sender),
     lastProcessedOffset
   )
 
@@ -230,6 +231,29 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     ),
     "exchange-transaction-broadcast"
   )
+
+  private val redisClient =
+    if (settings.redisInternalClientHandlerActor.enabled)
+      new RedisClient(settings.redis).some
+    else None
+
+  private val redisInternalActor = redisClient.filter(_ => settings.redisInternalClientHandlerActor.enabled).map { rc =>
+    actorSystem.spawn(
+      RedisInternalClientHandlerActor(settings.redisInternalClientHandlerActor, rc),
+      "RedisInternalHandlerActor"
+    ).tap(_ => log.info("Added Redis subscriber to internal stream"))
+  }
+
+  redisClient.foreach { rc =>
+    cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "Redis Client") { () =>
+      Future {
+        blocking {
+          rc.shutdown()
+        }
+        Done
+      }
+    }
+  }
 
   private val wsInternalBroadcastRef: typed.ActorRef[WsInternalBroadcastActor.Command] = actorSystem.spawn(
     WsInternalBroadcastActor(settings.webSockets.internalBroadcast),
@@ -367,7 +391,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
           order,
           AcceptedOrder.correctedAmountOfAmountAsset(order.amount, order.price),
           order.price,
-          settings.passExecutionParameters.forAccounts.contains(order.sender)
+          settings.lpAccounts.publicKeys.contains(order.sender)
         )
     )(_)
     new PlaceRoute(
@@ -633,7 +657,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   }
 
   startGuard.onComplete {
-    case Success(_) => setStatus(MatcherStatus.Working)
+    case Success(_) =>
+      redisInternalActor.foreach(wsInternalBroadcastRef ! WsInternalBroadcastActor.Command.Subscribe(_))
+      setStatus(MatcherStatus.Working)
     case Failure(e: ApplicationStopReason) => forceStopApplication(e)
     case Failure(e) =>
       log.error(s"Can't start matcher: ${e.getMessage}", e)

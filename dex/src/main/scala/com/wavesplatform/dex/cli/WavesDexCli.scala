@@ -56,7 +56,8 @@ object WavesDexCli extends ScoptImplicits {
         cmdInspectOrder(builder),
         cmdGenerateFeeSettings(builder),
         cmdDeleteOrderbook(builder),
-        cmdCheckOrdersForTxV3(builder)
+        cmdCheckOrdersForTxV3(builder),
+        cmdClearStaleOrderbooks(builder)
       )
     }
 
@@ -107,6 +108,7 @@ object WavesDexCli extends ScoptImplicits {
               case Command.GenerateFeeSettings => generateFeeSettings(args)
               case Command.DeleteOrderBook => deleteOrderBookFromLevelDb(args, matcherSettings)
               case Command.CheckOrdersForTxV3Compat => checkOrdersForTxV3Compat(args, matcherSettings)
+              case Command.ClearStaleOrderbooks => clearStaleOrderbooks(args, matcherSettings)
             }
             println("Done")
         }
@@ -118,6 +120,21 @@ object WavesDexCli extends ScoptImplicits {
     cmd(Command.CheckOrdersForTxV3Compat.name)
       .action((_, s) => s.copy(command = Command.CheckOrdersForTxV3Compat.some))
       .text("Prints all orders from orderbook that aren't compatible with Tx V3")
+      .children(
+        opt[String]("dex-config")
+          .abbr("dc")
+          .text("DEX config path")
+          .valueName("<raw-string>")
+          .required()
+          .action((x, s) => s.copy(configPath = x))
+      )
+  }
+
+  private def cmdClearStaleOrderbooks(builder: OParserBuilder[Args]) = {
+    import builder._
+    cmd(Command.ClearStaleOrderbooks.name)
+      .action((_, s) => s.copy(command = Command.ClearStaleOrderbooks.some))
+      .text("Removes all orderbook snapshots with empty asks and bids")
       .children(
         opt[String]("dex-config")
           .abbr("dc")
@@ -619,6 +636,10 @@ object WavesDexCli extends ScoptImplicits {
       override def name: String = "check-for-tx-v3-compat"
     }
 
+    case object ClearStaleOrderbooks extends Command {
+      override def name: String = "clear-stale-orderbooks"
+    }
+
   }
 
   private val defaultFile = new File(".")
@@ -648,7 +669,9 @@ object WavesDexCli extends ScoptImplicits {
     amountAssets: Seq[String] = Seq.empty,
     priceAssets: Seq[String] = Seq.empty,
     minFee: Double = 0.01,
-    minFeeInWaves: Long = 1000000
+    minFeeInWaves: Long = 1000000,
+    duration: FiniteDuration = 1.minute,
+    showDetails: Boolean = false
   )
 
 }

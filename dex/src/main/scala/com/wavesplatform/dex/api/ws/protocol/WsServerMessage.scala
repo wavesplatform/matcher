@@ -28,7 +28,7 @@ object WsServerMessage {
     }
   }
 
-  val wsServerMessageWrites: Writes[WsServerMessage] = Writes {
+  implicit val wsServerMessageWrites: Writes[WsServerMessage] = Writes {
     case x: WsPingOrPong => Json.toJson(x)
     case x: WsAddressChanges => Json.toJson(x)
     case x: WsOrderBookChanges => Json.toJson(x)

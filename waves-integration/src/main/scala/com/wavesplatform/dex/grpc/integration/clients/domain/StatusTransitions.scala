@@ -79,7 +79,8 @@ object StatusTransitions extends ScorexLogging {
                 val finalUtxUpdate = {
                   val x = origStatus.utxUpdate |+| UtxUpdate(
                     confirmedTxs = resolved.newConfirmedTxs,
-                    failedTxs = Map.empty // resolved.lostTxIds
+                    failedTxs = Map.empty,
+                    lostTxs = resolved.lostTxIds
                   )
 
                   // This solves a situation when rolled back transactions are moved to UTX Pool

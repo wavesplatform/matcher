@@ -207,10 +207,18 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         confirmedTxs = mkTransactionWithChangesMap(3)
       )
 
+      val emptyFullBlock = WavesBlock(
+        ref = BlockRef(height = 3, id = ByteStr(Array[Byte](98, 1, 1, 1, 0))),
+        reference = block2B.ref.id,
+        changes = BlockchainBalance.blockchainBalanceMonoid.empty,
+        tpe = WavesBlock.Type.FullBlock,
+        confirmedTxs = Map.empty
+      )
+
       val init = TransientRollback(
         fork = WavesFork(
           origChain = mkChain(Vector(block2A, block1), 98),
-          forkChain = mkChain(Vector(block2B, block1), 98)
+          forkChain = mkChain(Vector(emptyFullBlock, block2B, block1), 97)
         ),
         utxUpdate = UtxUpdate(
           unconfirmedTxs = List(
@@ -225,8 +233,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
       "Appended ->" - {
         "Normal" in {
           val microBlock = WavesBlock(
-            ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 1, 1))),
-            reference = block2B.ref.id,
+            ref = BlockRef(height = 3, id = ByteStr(Array[Byte](98, 1, 1, 1, 1))),
+            reference = emptyFullBlock.ref.id,
             changes = BlockchainBalance(
               regular = Map(alice -> Map(usd -> 8), carol -> Map(Waves -> 4)),
               outgoingLeasing = Map(bob -> 10)
@@ -243,10 +251,10 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = Normal(
-              main = mkChain(Vector(microBlock, block2B, block1), 98)
+              main = mkChain(Vector(microBlock, emptyFullBlock, block2B, block1), 97)
             ),
             updatedBalances = block2B.changes |+| microBlock.changes,
-            updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(2),
+            updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(3),
             utxUpdate = UtxUpdate(
               unconfirmedTxs = mkUtxTransactionMap(32), // init.utxUpdate, 31 is gone, because confirmed
               confirmedTxs = List(
@@ -316,8 +324,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
         "TransientResolving" in {
           val microBlock = WavesBlock(
-            ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 1))),
-            reference = block2B.ref.id,
+            ref = BlockRef(height = 3, id = ByteStr(Array[Byte](98, 1, 1, 1, 1))),
+            reference = emptyFullBlock.ref.id,
             changes = BlockchainBalance(
               regular = Map(alice -> Map(usd -> 8)),
               outgoingLeasing = Map(bob -> 10)
@@ -330,14 +338,15 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = TransientResolving(
-              main = mkChain(Vector(microBlock, block2B, block1), 98),
-              stashChanges = BlockchainBalance( // block2B + microBlock
+              main = mkChain(Vector(microBlock, emptyFullBlock, block2B, block1), 97),
+              stashChanges = BlockchainBalance( // block2B + emptyFullBlock + microBlock
                 regular = Map(alice -> Map(usd -> 8), bob -> Map(usd -> 12)),
                 outgoingLeasing = Map(bob -> 10)
               ),
               utxUpdate = init.utxUpdate |+| UtxUpdate(
                 confirmedTxs = block2B.confirmedTxs ++ microBlock.confirmedTxs,
-                failedTxs = Map.empty // Doesn't affect
+                failedTxs = Map.empty, // Doesn't affect
+                lostTxs = mkTransactionWithChangesMap(2)
               )
             ),
             requestBalances = DiffIndex(regular = Map(carol -> Set(Waves: Asset)), outgoingLeasing = Set.empty),

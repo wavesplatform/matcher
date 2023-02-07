@@ -22,7 +22,8 @@
             <pattern>${pattern}</pattern>
         </encoder>
     </appender>
-
+    
+    <logger name="org.redisson" level="INFO"/>
     <logger name="org.asynchttpclient" level="INFO"/>
     <logger name="io.netty" level="INFO"/>
     <logger name="io.swagger" level="OFF"/>

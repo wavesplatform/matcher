@@ -285,7 +285,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |  }
          |  order-db {
          |    max-orders = 100
-         |    parallelism = 6
+         |    parallelism = 3
          |  }
          |  waves-blockchain-client {
          |    grpc {

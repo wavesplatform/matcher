@@ -27,7 +27,7 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
         block.tpe == WavesBlock.Type.FullBlock && block.ref.height > (origChain.height + 1) ||
         // A new micro block on the same chain. The fork is not resolved when we append a micro block, that existed on an original chain
         // Also micro block can't happen on a height less than origChain.height, see docs/waves-node-interaction.md#Forks
-        block.tpe == WavesBlock.Type.MicroBlock && block.ref.height >= origChain.height && !origChain.has(block.ref)
+        block.tpe == WavesBlock.Type.MicroBlock && block.ref.height > origChain.height && !origChain.has(block.ref)
       ) {
         val (origDropped, forkDropped) = WavesChain.dropDifference(origChain, updatedForkChain)
 

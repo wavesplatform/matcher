@@ -5,6 +5,7 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.it.config.GenesisConfig
+import com.wavesplatform.dex.it.metamask.EthTransactionsHelper
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.it.MatcherSuiteBase
 import org.web3j.crypto.{Bip32ECKeyPair, Keys}

@@ -4,6 +4,7 @@ import com.wavesplatform.dex.domain.account.{AddressScheme, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.crypto.EthereumKeyLength
 import org.web3j.crypto.Sign.SignatureData
 import org.web3j.crypto.{ECDSASignature, ECKeyPair, Sign, StructuredDataEncoder}
 import play.api.libs.json.{JsObject, Json}
@@ -27,19 +28,12 @@ object EthOrders {
 
   def recoverEthSignerKey(order: Order, signature: Array[Byte]): PublicKey = {
     val bytes = hashOrderStruct(order)
-    recoverEthSignerKey(bytes, signature)
-  }
 
-  private def recoverEthSignerKey(message: Array[Byte], signature: Array[Byte]): PublicKey = {
-    val signatureData = EthOrders.decodeSignature(signature)
-    val signerKey = Sign
-      .recoverFromSignature(
-        signatureData.getV.head - 27,
-        new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS)),
-        message
-      )
-      .toByteArray
-      .takeRight(64)
+    val signerKey = org.web3j.utils.Numeric.toBytesPadded(
+      recoverEthSignerKeyBigInt(bytes, signature),
+      EthereumKeyLength
+    )
+
     PublicKey(ByteStr(signerKey))
   }
 
@@ -62,6 +56,18 @@ object EthOrders {
     buffer.get(S)
     val V = buffer.get()
     new SignatureData(V, R, S)
+  }
+
+  private def recoverEthSignerKeyBigInt(message: Array[Byte], signature: Array[Byte]): BigInteger = {
+    val signatureData = EthOrders.decodeSignature(signature)
+    val v = BigInt(1, signatureData.getV)
+    val recId = if (v == 0 || v == 1) v else if (v > 28) v - AddressScheme.current.chainId * 2 - 35 else v - 27
+    Sign
+      .recoverFromSignature(
+        recId.intValue,
+        new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS)),
+        message
+      )
   }
 
   private def toEip712Json(order: Order): JsObject = {

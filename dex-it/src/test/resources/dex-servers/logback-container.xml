@@ -33,6 +33,7 @@
         <appender-ref ref="DETAILED"/>
     </root>
 
+    <logger name="org.redisson" level="INFO"/>
     <logger name="com.wavesplatform.dex.api.http.routes.v0" level="DEBUG"/>
 
     <!-- Networking -->

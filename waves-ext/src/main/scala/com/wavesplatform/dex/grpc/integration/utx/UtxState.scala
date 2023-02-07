@@ -28,7 +28,7 @@ case class UtxState(
 
   def getAccountsDiff(blockchain: Blockchain): Diff = {
     def relevantDiff(diff: Diff): Boolean =
-      diff.transactions.values.exists { txInfo =>
+      diff.transactions.exists { txInfo =>
         txInfo.affected.intersect(accounts).nonEmpty
       }
 
@@ -45,7 +45,7 @@ case class UtxState(
   def handleEvent(evt: events.UtxEvent): (Option[UtxEvent], UtxState) =
     evt match {
       case TxRemoved(tx, reason) =>
-        log.debug(s"${tx.id()} removed due to: $reason (canRetry = ${reason.fold("?")(canRetry(_).toString)})")
+        log.debug(s"${tx.id()} removed due to: $reason (canRetry = ${reason.fold("?")(canRetry(_, None, Set.empty).toString)})")
         remove(tx, reason)
       case TxAdded(tx, diff) =>
         log.debug(s"tx ${tx.id()} added")

@@ -327,7 +327,7 @@ class OrderBookDirectoryActor(
 
       validAssetPairs = assetPairs.flatMap(validateAssetPair(_).toOption)
       _ = log.info(s"Valid asset pairs: ${validAssetPairs.size}, invalid asset pairs: ${assetPairs.size - validAssetPairs.size}")
-      snapshots <- orderBookSnapshotDb.iterateSnapshots(validAssetPairs.contains)
+      snapshots <- orderBookSnapshotDb.iterateSnapshotsByPair(validAssetPairs.contains)
       offsets <- orderBookSnapshotDb.iterateOffsets(validAssetPairs.contains)
       result = validAssetPairs.map { pair =>
         pair -> offsets.get(pair).zip(snapshots.get(pair))

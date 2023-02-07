@@ -31,9 +31,9 @@ class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxConfirmedTr
    * @return (affected addresses, unknown transactions)
    */
   override def processConfirmed(txIds: Iterable[ByteString]): (Set[Address], List[ByteString]) = {
-    // We don't filter, because a transaction can't be forged twice
-    txIds.foreach(confirmedTxs.append)
-    orig.processConfirmed(txIds)
+    val newTxIds = txIds.filterNot(confirmedTxs.contains)
+    newTxIds.foreach(confirmedTxs.append)
+    orig.processConfirmed(newTxIds)
   }
 
   override def removeFailed(txIds: Iterable[ByteString]): Set[Address] =

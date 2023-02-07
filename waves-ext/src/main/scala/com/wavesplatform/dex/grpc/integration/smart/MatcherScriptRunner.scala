@@ -30,7 +30,8 @@ object MatcherScriptRunner {
     useNewPowPrecision: Boolean,
     checkEstimatorSumOverflow: Boolean,
     newEvaluatorMode: Boolean,
-    checkWeakPk: Boolean
+    checkWeakPk: Boolean,
+    fixBigScriptField: Boolean
   ): Either[ExecutionError, EVALUATED] =
     ScriptRunner.applyGeneric(
       in = Coproduct[ScriptRunner.TxOrd](order),
@@ -45,7 +46,8 @@ object MatcherScriptRunner {
       useNewPowPrecision,
       checkEstimatorSumOverflow,
       newEvaluatorMode,
-      checkWeakPk
+      checkWeakPk,
+      fixBigScriptField
     )._3
 
   private class Denied(methodName: String)

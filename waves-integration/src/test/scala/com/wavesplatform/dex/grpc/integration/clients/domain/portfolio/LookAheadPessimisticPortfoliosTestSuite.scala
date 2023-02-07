@@ -76,6 +76,38 @@ class LookAheadPessimisticPortfoliosTestSuite extends PessimisticPortfoliosTestS
           }
         }
 
+        "handle UtxUpdate with confirmedTxs and resetCaches = true" in forAll(
+          pessimisticPortfoliosGen,
+          pessimisticTransactionGen,
+          pessimisticTransactionGen
+        ) { case (pp, unknownTx1, unknownTx2) =>
+          pp.processUtxUpdate(
+            unconfirmedTxs = Seq(unknownTx1),
+            confirmedTxs = Seq(unknownTx2.txId),
+            failedTxs = Seq.empty,
+            resetCaches = true
+          )
+          val prevState = getState(pp)
+
+          pp.processUtxUpdate(
+            unconfirmedTxs = Seq(unknownTx2),
+            confirmedTxs = Seq.empty,
+            failedTxs = Seq.empty,
+            resetCaches = false
+          )
+
+          val newState = getState(pp)
+
+          newState.foreach { case (address, changes) =>
+            changes.foreach {
+              case (asset, change) =>
+                // because tx was in portfolio and now, when it's gone, it must be prevValue from state, or 0
+                val prevValue = prevState.get(address).flatMap(_.get(asset)).getOrElse(0)
+                change shouldBe prevValue
+            }
+          }
+        }
+
         "are limited by maxConfirmedTransactions" in forAll(testGen, pessimisticTransactionGen, pessimisticTransactionGen) {
           case ((pp, unknownTx1), unknownTx2, unknownTx3) =>
             val before = getState(pp)

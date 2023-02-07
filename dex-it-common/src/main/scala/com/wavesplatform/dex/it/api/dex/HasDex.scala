@@ -1,10 +1,7 @@
 package com.wavesplatform.dex.it.api.dex
 
-import java.util.Properties
-import java.util.concurrent.ThreadLocalRandom
 import cats.Functor
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.Version.VersionString
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.docker.DexContainer
@@ -12,6 +9,8 @@ import com.wavesplatform.dex.it.fp.CanRepeat
 import mouse.any._
 import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
 
+import java.util.Properties
+import java.util.concurrent.ThreadLocalRandom
 import scala.jdk.CollectionConverters._
 
 trait HasDex { self: BaseContainersKit =>
@@ -38,8 +37,6 @@ trait HasDex { self: BaseContainersKit =>
        |  }
        |}""".stripMargin
   )
-
-  protected def dexVersion: String = if (dexImage == defaultDexImage) VersionString else dexImage
 
   protected def createDex(
     name: String,

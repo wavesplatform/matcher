@@ -141,10 +141,15 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
           else broadcastTransaction(tx).map {
             _.resultE match {
               case Right(isNew) => CheckedBroadcastResponse.Result.Unconfirmed(isNew)
-              case Left(e) => CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(e.toString, canRetry(e)))
+              case Left(e) =>
+                CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(e.toString, canRetry(e, tx.some, lpAccountsAddresses)))
             }
           }
-        case Left(e) => Future.successful(CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(e.toString, canRetry(e))))
+        case Left(e) =>
+          Future.successful(CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(
+            e.toString,
+            canRetry(e, None, lpAccountsAddresses)
+          )))
       }
       .map(CheckedBroadcastResponse(_))
       .recover {
@@ -247,6 +252,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
         val checkEstimatorSumOverflow = context.blockchain.checkEstimatorSumOverflow
         val newEvaluatorMode = context.blockchain.newEvaluatorMode
         val checkWeakPk = context.blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
+        val fixBigScript = context.blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements)
 
         if (allowedBlockchainStateAccounts.contains(order.senderPublicKey) || lpAccounts.contains(order.senderPublicKey)) {
           val blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff(context.blockchain))
@@ -259,7 +265,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
             useNewPowPrecision,
             checkEstimatorSumOverflow,
             newEvaluatorMode,
-            checkWeakPk
+            checkWeakPk,
+            fixBigScript
           ))
         } else
           parseScriptResult(MatcherScriptRunner(
@@ -271,7 +278,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
             useNewPowPrecision,
             checkEstimatorSumOverflow,
             newEvaluatorMode,
-            checkWeakPk
+            checkWeakPk,
+            fixBigScript
           ))
     }
 

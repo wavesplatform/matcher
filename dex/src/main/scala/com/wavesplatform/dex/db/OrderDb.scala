@@ -105,9 +105,9 @@ object OrderDb {
         }(getEcBySender(sender))
       }
 
-    override def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): Future[Seq[(Order.Id, OrderInfo[OrderStatus])]] =
+    override def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): Future[Seq[(Order.Id, OrderInfo[OrderStatus])]] = {
+      val ec = getEcBySender(owner)
       measureDb(cls, "getFinalizedOrders") {
-        val ec = getEcBySender(owner)
         Future {
           db.readOnly { ro =>
             val (seqNr, key) =
@@ -130,8 +130,9 @@ object OrderDb {
               }
             } yield id -> oi
           }
-        }(ec).map(_.sorted(orderInfoOrdering))(ec)
-      }
+        }(ec)
+      }.map(_.sorted(orderInfoOrdering))(ec)
+    }
 
     override def getOrderInfo(id: Order.Id): Future[Option[FinalOrderInfo]] =
       measureDb(cls, "getOrderInfo") {

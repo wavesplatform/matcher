@@ -17,7 +17,8 @@ trait OrderBookSnapshotDb[F[_]] {
   def update(assetPair: AssetPair, offset: Offset, newSnapshot: Option[OrderBookSnapshot]): F[Unit]
   def delete(assetPair: AssetPair): F[Unit]
   def iterateOffsets(pred: AssetPair => Boolean): F[Map[AssetPair, Offset]]
-  def iterateSnapshots(pred: AssetPair => Boolean): F[Map[AssetPair, OrderBookSnapshot]]
+  def iterateSnapshotsByPair(pred: AssetPair => Boolean): F[Map[AssetPair, OrderBookSnapshot]]
+  def iterateSnapshots(pred: (AssetPair, OrderBookSnapshot) => Boolean): F[Map[AssetPair, OrderBookSnapshot]]
 }
 
 object OrderBookSnapshotDb {
@@ -65,8 +66,8 @@ object OrderBookSnapshotDb {
         }
       }
 
-    def iterateSnapshots(pred: AssetPair => Boolean): F[Map[AssetPair, OrderBookSnapshot]] =
-      measureDb(cls, "iterateSnapshots") {
+    def iterateSnapshotsByPair(pred: AssetPair => Boolean): F[Map[AssetPair, OrderBookSnapshot]] =
+      measureDb(cls, "iterateSnapshotsByPair") {
         levelDb.readOnly { ro =>
           val m = Map.newBuilder[AssetPair, OrderBookSnapshot]
           ro.iterateOver(DbKeys.OrderBookSnapshotPrefix) { entry =>
@@ -80,6 +81,20 @@ object OrderBookSnapshotDb {
 
     private def keys(assetPair: AssetPair): (Key[Option[Offset]], Key[Option[OrderBookSnapshot]]) =
       (DbKeys.orderBookSnapshotOffset(assetPair), DbKeys.orderBookSnapshot(assetPair))
+
+    override def iterateSnapshots(pred: (AssetPair, OrderBookSnapshot) => Boolean): F[Map[AssetPair, OrderBookSnapshot]] =
+      measureDb(cls, "iterateSnapshots") {
+        levelDb.readOnly { ro =>
+          val m = Map.newBuilder[AssetPair, OrderBookSnapshot]
+          ro.iterateOver(DbKeys.OrderBookSnapshotPrefix) { entry =>
+            val pair = AssetPair.fromBytes(entry.getKey.drop(2))._1
+            val snapshot = OrderBookSnapshot.fromBytes(ByteBuffer.wrap(entry.getValue))
+            if (pred(pair, snapshot))
+              m.addOne(pair -> snapshot)
+          }
+          m.result()
+        }
+      }
 
   }
 

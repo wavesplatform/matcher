@@ -40,7 +40,7 @@ class OrderBookSnapshotDbSpec extends AnyFreeSpec with Matchers with WithDb with
           v.foreach { case (snapshot, assetPair, offset) =>
             obsdb.update(assetPair, offset, Some(snapshot))
           }
-          val snapshots = obsdb.iterateSnapshots(_ => true)
+          val snapshots = obsdb.iterateSnapshotsByPair(_ => true)
           val offsets = obsdb.iterateOffsets(_ => true)
 
           val expected = v.map(_._2).toSet.map { pair: AssetPair =>
@@ -70,7 +70,7 @@ class OrderBookSnapshotDbSpec extends AnyFreeSpec with Matchers with WithDb with
           }
 
           val filteredV = v.filterNot { case (_, pair, _) => ignoredPairs.contains(pair) }
-          val snapshots = obsdb.iterateSnapshots(!ignoredPairs.contains(_))
+          val snapshots = obsdb.iterateSnapshotsByPair(!ignoredPairs.contains(_))
           val offsets = obsdb.iterateOffsets(!ignoredPairs.contains(_))
 
           filteredV.size shouldBe snapshots.size

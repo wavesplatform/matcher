@@ -14,7 +14,11 @@ import pureconfig.configurable.genericMapReader
 import pureconfig.error.CannotConvert
 import pureconfig.generic.semiauto
 
-sealed trait OrderFeeSettings extends Product with Serializable
+sealed trait OrderFeeSettings extends Product with Serializable {
+
+  def withDynamicCustomAssets(assets: Set[Asset]): OrderFeeSettings = this
+
+}
 
 object OrderFeeSettings {
 
@@ -86,21 +90,27 @@ object OrderFeeSettings {
 
   final case class CompositeSettings(
     default: OrderFeeSettings,
-    custom: Map[AssetPair, OrderFeeSettings] = Map.empty,
+    dynamicCustomAssets: Boolean = false,
+    customPairs: Map[AssetPair, OrderFeeSettings] = Map.empty,
     customAssets: Option[CompositeSettings.CustomAssetsSettings] = None,
     discount: Option[CompositeSettings.DiscountAssetSettings] = None,
     zeroFeeAccounts: Set[PublicKey] = Set.empty
   ) extends OrderFeeSettings {
 
+    override def withDynamicCustomAssets(assets: Set[Asset]): OrderFeeSettings =
+      if (dynamicCustomAssets)
+        copy(customAssets = customAssets.map(_.copy(assets = assets)))
+      else this
+
     def getOrderFeeSettings(assetPair: AssetPair): OrderFeeSettings =
-      custom.get(assetPair).orElse {
+      customPairs.get(assetPair).orElse {
         customAssets.flatMap(_.getSettings(assetPair))
       }.getOrElse(default)
 
     def getAllCustomFeeSettings: Map[AssetPair, OrderFeeSettings] =
       customAssets.fold(Map.empty[AssetPair, OrderFeeSettings])(
         _.settingsMap
-      ) ++ custom // "custom" has higher priority than "customAssets"
+      ) ++ customPairs // "customPairs" has higher priority than "customAssets"
 
   }
 
@@ -118,6 +128,8 @@ object OrderFeeSettings {
 
       def getSettings(assetPair: AssetPair): Option[OrderFeeSettings] =
         settingsMap.get(assetPair)
+
+      override def toString: String = s"CustomAssetsSettings(a=$assets, settings=$settings, customPairs=$customPairs)"
 
     }
 
@@ -169,19 +181,21 @@ object OrderFeeSettings {
 
     type PartialCompositeSettings = AssetPairQuickValidator => CompositeSettings
 
-    implicit val partialCompositeConfigReader: ConfigReader[PartialCompositeSettings] = ConfigReader.forProduct5[
+    implicit val partialCompositeConfigReader: ConfigReader[PartialCompositeSettings] = ConfigReader.forProduct6[
       PartialCompositeSettings,
       OrderFeeSettings,
+      Option[Boolean],
       Option[Map[AssetPair, OrderFeeSettings]],
       Option[PartialCustomAssetSettings],
       Option[CompositeSettings.DiscountAssetSettings],
       Option[Set[PublicKey]]
-    ]("default", "custom", "custom-assets", "discount", "zero-fee-accounts") {
-      case (default, custom, customAssets, discount, zeroFeeAccounts) =>
+    ]("default", "dynamic-custom-assets", "custom-pairs", "custom-assets", "discount", "zero-fee-accounts") {
+      case (default, dynamicCustomAssets, customPairs, customAssets, discount, zeroFeeAccounts) =>
         pairValidator: AssetPairQuickValidator =>
           CompositeSettings(
             default,
-            custom.getOrElse(Map.empty),
+            dynamicCustomAssets.getOrElse(false),
+            customPairs.getOrElse(Map.empty),
             customAssets.map(_(pairValidator)),
             discount,
             zeroFeeAccounts.getOrElse(Set.empty)

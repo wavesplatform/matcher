@@ -7,7 +7,7 @@ import cats.data.NonEmptyList
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
 import cats.syntax.option._
-import com.wavesplatform.dex.actors.OrderBookDirectoryActor.SaveSnapshot
+import com.wavesplatform.dex.actors.OrderBookDirectoryActor.{ApplyValidatedCommandWithPair, SaveSnapshot}
 import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor._
@@ -22,8 +22,8 @@ import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.Events._
 import com.wavesplatform.dex.model.OrderBook.OrderBookUpdates
 import com.wavesplatform.dex.model._
+import com.wavesplatform.dex.queue.ValidatedCommand
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
-import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.dex.time.Time
 import kamon.Kamon
@@ -53,9 +53,9 @@ class OrderBookActor(
 
   private var aggregatedRef: typed.ActorRef[AggregatedOrderBookActor.InputMessage] = _
 
-  private var savingSnapshot = Option.empty[ValidatedCommandWithMeta.Offset]
-  private var lastSavedSnapshotOffset = Option.empty[ValidatedCommandWithMeta.Offset]
-  private var lastProcessedOffset = Option.empty[ValidatedCommandWithMeta.Offset]
+  private var savingSnapshot = Option.empty[Offset]
+  private var lastSavedSnapshotOffset = Option.empty[Offset]
+  private var lastProcessedOffset = Option.empty[Offset]
 
   private val addTimer = Kamon.timer("matcher.orderbook.add").withTag("pair", assetPair.toString)
   private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").withTag("pair", assetPair.toString)
@@ -63,7 +63,7 @@ class OrderBookActor(
 
   private var actualRule: MatchingRule = normalizeMatchingRule(matchingRules.head)
 
-  private def actualizeRules(offset: ValidatedCommandWithMeta.Offset): Unit = {
+  private def actualizeRules(offset: Offset): Unit = {
     val actualRules = DenormalizedMatchingRule.skipOutdated(offset, matchingRules)
     if (matchingRules.head != actualRules.head) {
       matchingRules = actualRules
@@ -127,7 +127,7 @@ class OrderBookActor(
 
   private def working: Receive = {
     // DEX-1192 docs/places-and-cancels.md
-    case request: ValidatedCommandWithMeta =>
+    case request: ApplyValidatedCommandWithPair =>
       actualizeRules(request.offset)
       lastProcessedOffset match {
         case Some(lastProcessed) if request.offset <= lastProcessed => // Already processed
@@ -202,7 +202,7 @@ class OrderBookActor(
     }
   }
 
-  private def onCancelOrder(command: ValidatedCommandWithMeta, cancelCommand: ValidatedCommand.CancelOrder): Unit = cancelTimer.measure {
+  private def onCancelOrder(command: ApplyValidatedCommandWithPair, cancelCommand: ValidatedCommand.CancelOrder): Unit = cancelTimer.measure {
     orderBook.cancel(cancelCommand.orderId, toReason(cancelCommand.source), command.timestamp) match {
       case (updatedOrderBook, Some(cancelEvent), levelChanges) =>
         log.trace(s"Applied $command")
@@ -228,7 +228,7 @@ class OrderBookActor(
     }
   }
 
-  private def onAddOrder(command: ValidatedCommandWithMeta, acceptedOrder: AcceptedOrder): Unit = addTimer.measure {
+  private def onAddOrder(command: ApplyValidatedCommandWithPair, acceptedOrder: AcceptedOrder): Unit = addTimer.measure {
     log.trace(s"Applied $command, trying to match ...")
     process(
       command.timestamp,
@@ -248,7 +248,7 @@ class OrderBookActor(
     super.preRestart(reason, message)
   }
 
-  private def saveSnapshotAt(globalEventNr: ValidatedCommandWithMeta.Offset): Unit = {
+  private def saveSnapshotAt(globalEventNr: Offset): Unit = {
     val saveSnapshot = (lastSavedSnapshotOffset, lastProcessedOffset).tupled.forall { case (saved, processed) => saved < processed }
     val toSave = if (saveSnapshot) Some(orderBook.snapshot) else None
 

@@ -347,7 +347,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |    -4: {
          |      mode = "composite"
          |      composite {
-         |        custom {
+         |        custom-pairs {
          |          DWgwcZTMhSvnyYCoWLRUXXSH1RSkzThXLJhww9gwkqdn-25FEqEjRkqK6yCkiT7Lz6SAYz7gUFCtxfCChnrVFD5AT {
          |            mode = "percent"
          |            percent {

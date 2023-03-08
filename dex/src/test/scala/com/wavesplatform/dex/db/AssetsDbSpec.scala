@@ -12,7 +12,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class AssetsDbSpec extends AnyFreeSpec with Matchers with AssetDescriptionGen with WithDb with PropertyChecks with NoShrink {
 
   "AssetsDb.levelDb implementation" - {
-    "stores and reads all assets" in forAll(Gen.mapOf(assertDescriptionGen)) { assets =>
+    "stores and reads all assets" in forAll(Gen.mapOf(assetDescriptionGen)) { assets =>
       test { adb: AssetsDb[Id] =>
         assets.foreach(Function.tupled(adb.put))
         assets.foreach {

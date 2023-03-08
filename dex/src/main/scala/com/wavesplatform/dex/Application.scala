@@ -33,6 +33,7 @@ import com.wavesplatform.dex.api.routes.ApiRoute
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsInternalBroadcastActor}
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
 import com.wavesplatform.dex.app._
+import com.wavesplatform.dex.caches.OrderFeeSettingsCache.{AssetsActionForOffset, CustomAssetFeeState}
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
@@ -143,6 +144,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val assetPairsDb = AssetPairsDb.levelDb(commonLevelDb)
   private val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(snapshotsLevelDb)
   private val orderDb = OrderDb.levelDb(settings.orderDb, db, levelDbEcMap)
+  private val customFeeAssetsDb = CustomFeeAssetsDb.levelDb(commonLevelDb)
 
   private val assetsCache = AssetsCache.from(AssetsDb.levelDb(commonLevelDb))
 
@@ -212,8 +214,14 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val pairBuilder = new AssetPairBuilder(settings, getAndCacheDescription, settings.blacklistedAssets)
 
+  private val allFeeAssetsActions = Await.result(customFeeAssetsDb.all(), 1.minute)
+
+  private val cfaState = allFeeAssetsActions.foldLeft(CustomAssetFeeState.empty) {
+    case (state, action) => state.applyAssetsActionForOffset(action)
+  }
+
   private val orderFeeSettingsCache =
-    new OrderFeeSettingsCache(settings.orderFee.view.mapValues(_(pairBuilder.quickValidateAssetPair(_).isRight)).toMap)
+    new OrderFeeSettingsCache(settings.orderFee.view.mapValues(_(pairBuilder.quickValidateAssetPair(_).isRight)).toMap, cfaState)
 
   private val exchangeTxStorage = ExchangeTxStorage.levelDB(commonLevelDb)
 
@@ -530,8 +538,21 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     currentOffset = () => lastProcessedOffset
   )
 
+  private val customFeeAssetsRoute = new CustomAssetsFeeRoute(apiKeyHashes, orderFeeSettingsCache, storeCommand)
+
   private val v0HttpRoute =
-    Seq(infoRoute, ratesRoute, debugRoute, marketsRoute, historyRoute, placeRoute, cancelRoute, balancesRoute, transactionsRoute)
+    Seq(
+      infoRoute,
+      ratesRoute,
+      debugRoute,
+      marketsRoute,
+      historyRoute,
+      placeRoute,
+      cancelRoute,
+      balancesRoute,
+      transactionsRoute,
+      customFeeAssetsRoute
+    )
 
   private val v1HttpRoute = Seq(OrderBookRoute(
     assetPairBuilder = pairBuilder,
@@ -692,37 +713,77 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       val loadAssets = eventAssets.traverse(getAndCacheDescription).value
 
       loadAssets.flatMap { _ =>
-        val assetPairs: Set[AssetPair] = xs
-          .map { validatedCommandWithMeta =>
-            lazy val handleValidatedCommandWithMeta = {
-              log.debug(s"Consumed $validatedCommandWithMeta")
-              orderBookDirectoryActorRef ! validatedCommandWithMeta
-              lastProcessedOffset = validatedCommandWithMeta.offset
-              validatedCommandWithMeta.command.assetPair
-            }
+        val (pairs, future) = xs.foldLeft((Set.empty[AssetPair], Future.unit)) {
+          case ((pairs, future), validatedCommand) =>
+            log.debug(s"Consumed $validatedCommand")
+            validatedCommand.command match {
+              case cmd: OrderBookValidatedCommand =>
+                lazy val handleCommand = {
+                  orderBookDirectoryActorRef ! OrderBookDirectoryActor.ApplyValidatedCommandWithPair(
+                    validatedCommand.offset,
+                    validatedCommand.timestamp,
+                    cmd
+                  )
+                  lastProcessedOffset = validatedCommand.offset
+                  cmd.assetPair
+                }
 
-            validatedCommandWithMeta.command.maybeCtx.fold(handleValidatedCommandWithMeta) { ctx =>
-              if (status == MatcherStatus.Working) {
-                val parentSpan = ctx.get(kamon.trace.Span.Key)
-                val span =
-                  Kamon.spanBuilder(s"consumedValidatedCommandWithMeta")
-                    .asChildOf(parentSpan)
-                    .traceId(parentSpan.trace.id)
-                    .tag(ctx.tags)
-                    .samplingDecision(KamonTraceUtils.Sample)
-                    .doNotTrackMetrics()
-                    .start()
-                Kamon.runWithSpan[AssetPair](span)(handleValidatedCommandWithMeta)
-              } else
-                handleValidatedCommandWithMeta
+                val newFuture = future.map { _ =>
+                  cmd.maybeCtx.fold(handleCommand) { ctx =>
+                    if (status == MatcherStatus.Working) {
+                      val parentSpan = ctx.get(kamon.trace.Span.Key)
+                      val span =
+                        Kamon.spanBuilder(s"consumedValidatedCommandWithMeta")
+                          .asChildOf(parentSpan)
+                          .traceId(parentSpan.trace.id)
+                          .tag(ctx.tags)
+                          .samplingDecision(KamonTraceUtils.Sample)
+                          .doNotTrackMetrics()
+                          .start()
+                      Kamon.runWithSpan[AssetPair](span)(handleCommand)
+                    } else
+                      handleCommand
+                  }
+                  ()
+                }
+                (pairs + cmd.assetPair, newFuture)
+              case cmd: ValidatedCommand.AddCustomAssetToFee =>
+                val action = AssetsActionForOffset(assets = cmd.assets, offset = validatedCommand.offset, isAdded = true)
+                val newFuture = customFeeAssetsDb.save(action).tap(_.onComplete {
+                  case Failure(ex) =>
+                    log.error("Error while event processing occurred: ", ex)
+                    forceStopApplication(EventProcessingError)
+                  case Success(_) =>
+                    orderFeeSettingsCache.applyAssetsActionForOffset(action)
+                    lastProcessedOffset = action.offset
+                })
+                (pairs, newFuture)
+
+              case cmd: ValidatedCommand.DeleteCustomAssetToFee =>
+                val action = AssetsActionForOffset(assets = cmd.assets, offset = validatedCommand.offset, isAdded = false)
+                val newFuture = customFeeAssetsDb.save(action).tap(_.onComplete {
+                  case Failure(ex) =>
+                    log.error("Error while event processing occurred: ", ex)
+                    forceStopApplication(EventProcessingError)
+                  case Success(_) =>
+                    orderFeeSettingsCache.applyAssetsActionForOffset(action)
+                    lastProcessedOffset = action.offset
+                })
+                (pairs, newFuture)
             }
+        }
+
+        if (pairs.nonEmpty)
+          future.flatMap { _ =>
+            orderBookDirectoryActorRef
+              .ask(OrderBookDirectoryActor.PingAll(pairs))(processConsumedTimeout)
+              .recover {
+                case NonFatal(e) =>
+                  log.error("PingAll is timed out!", e)
+              }.map(_ => ())
           }
-          .to(Set)
+        else future
 
-        orderBookDirectoryActorRef
-          .ask(OrderBookDirectoryActor.PingAll(assetPairs))(processConsumedTimeout)
-          .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
-          .map(_ => ())
       } andThen {
         case Failure(ex) =>
           log.error("Error while event processing occurred: ", ex)

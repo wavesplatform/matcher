@@ -21,6 +21,8 @@ import com.wavesplatform.dex.protobuf.order.{
   Order => PbOrder,
   PlaceLimitOrder => PbPlaceLimitOrder,
   PlaceMarketOrder => PbPlaceMarketOrder,
+  AddFeeCustomAssets => PbAddFeeCustomAssets,
+  DeleteFeeCustomAssets => PbDeleteFeeCustomAssets,
   ValidatedCommand => PbValidatedCommand
 }
 // format: on
@@ -70,64 +72,93 @@ object ValidatedCommandPbConversions {
         val pbAssetPair = writeToPbAssetPair(assetPair)
         val cmd = PbValidatedCommand.Command.DeleteOrderBook(PbEmpty())
         PbValidatedCommand(pbAssetPair.some, writeCtx(maybeCtx), cmd)
+
+      case ValidatedCommand.AddCustomAssetToFee(assets) =>
+        val cmd = PbValidatedCommand.Command.AddFeeCustomAssets(PbAddFeeCustomAssets(assets.map(writeToPbAsset).toSeq))
+        PbValidatedCommand(assetPair = None, command = cmd)
+
+      case ValidatedCommand.DeleteCustomAssetToFee(assets) =>
+        val cmd = PbValidatedCommand.Command.DeleteFeeCustomAssets(PbDeleteFeeCustomAssets(assets.map(writeToPbAsset).toSeq))
+        PbValidatedCommand(assetPair = None, command = cmd)
     }
   }
 
   def fromPb(pbValidatedCommand: PbValidatedCommand): Either[ValidationError, ValidatedCommand] =
-    pbValidatedCommand.assetPair.toRight(GenericError("Asset pair is empty")).map(readPbAssetPair).flatMap { assetPair =>
-      val maybeCtx = Either.catchNonFatal(KamonTraceUtils.readCtx(pbValidatedCommand.kamonCtx.toVanilla)).toOption
-
-      val pbCmd = pbValidatedCommand.command
-      if (pbCmd.isPlaceLimitOrder)
-        for {
-          pbPlaceLimitOrder <- pbCmd.placeLimitOrder.toRight(GenericError("Place limit order is empty"))
-          pbOrder <- pbPlaceLimitOrder.order.toRight(GenericError("Order is empty"))
-          order <- readPbOrder(pbOrder)
-        } yield ValidatedCommand.PlaceOrder(
-          limitOrder = LimitOrder(
-            o = order,
-            percentMinFee = pbPlaceLimitOrder.percentMinFee.map(_.value),
-            percentConstMinFee = pbPlaceLimitOrder.percentConstMinFee.map(_.value)
-          ),
-          maybeCtx = maybeCtx
-        )
-      else if (pbCmd.isPlaceMarketOrder)
-        for {
-          pbPlaceMarketOrder <- pbCmd.placeMarketOrder.toRight(GenericError("Place market order is empty"))
-          pbOrder <- pbPlaceMarketOrder.order.toRight(GenericError("Order is empty"))
-          order <- readPbOrder(pbOrder)
-        } yield ValidatedCommand.PlaceMarketOrder(
-          marketOrder = MarketOrder(
-            o = order,
-            availableForSpending = pbPlaceMarketOrder.availableForSpending,
-            percentMinFee = pbPlaceMarketOrder.percentMinFee.map(_.value),
-            percentConstMinFee = pbPlaceMarketOrder.percentConstMinFee.map(_.value)
-          ),
-          maybeCtx = maybeCtx
-        )
-      else if (pbCmd.isCancelOrder)
-        for {
-          pbCancelOrder <- pbCmd.cancelOrder.toRight(GenericError("Cancel order is empty"))
-          orderId = pbCancelOrder.orderId.toByteArray
-          source <- pbCancelOrder.source match {
-            case PbCancelOrder.Source.NOT_TRACKED => Right(Source.NotTracked)
-            case PbCancelOrder.Source.REQUEST => Right(Source.Request)
-            case PbCancelOrder.Source.EXPIRATION => Right(Source.Expiration)
-            case PbCancelOrder.Source.BALANCE_TRACKING => Right(Source.BalanceTracking)
-            case PbCancelOrder.Source.Unrecognized(v) => Left(GenericError(s"Unknown source type: $v"))
-          }
-          owner <- {
-            if (pbCancelOrder.owner.isEmpty)
-              Right(Option.empty)
-            else
-              Address.fromBytes(pbCancelOrder.owner.toVanilla).map(_.some)
-          }
-        } yield ValidatedCommand.CancelOrder(assetPair, orderId, source, owner, maybeCtx)
-      else if (pbCmd.isDeleteOrderBook)
-        Right(ValidatedCommand.DeleteOrderBook(assetPair, maybeCtx))
-      else
-        Right(ValidatedCommand.CancelAllOrders(assetPair, maybeCtx))
+    pbValidatedCommand.assetPair.map(readPbAssetPair) match {
+      case Some(assetPair) =>
+        val maybeCtx = Either.catchNonFatal(KamonTraceUtils.readCtx(pbValidatedCommand.kamonCtx.toVanilla)).toOption
+        tryParseCommandWithPair(pbValidatedCommand, assetPair, maybeCtx)
+      case None =>
+        tryParseCommand(pbValidatedCommand)
     }
+
+  private def tryParseCommand(pbValidatedCommand: PbValidatedCommand): Either[GenericError, ValidatedCommand] = {
+    val pbCmd = pbValidatedCommand.command
+    pbCmd.addFeeCustomAssets
+      .map(cmd => ValidatedCommand.AddCustomAssetToFee(cmd.assetId.map(_.toVanillaAsset).toSet))
+      .orElse(pbCmd.deleteFeeCustomAssets
+        .map(cmd => ValidatedCommand.DeleteCustomAssetToFee(cmd.assetId.map(_.toVanillaAsset).toSet))).toRight(GenericError(
+        "Command without pair must be either AddFeeCustomAssets or DeleteFeeCustomAssets"
+      ))
+  }
+
+  private def tryParseCommandWithPair(
+    pbValidatedCommand: PbValidatedCommand,
+    assetPair: AssetPair,
+    maybeCtx: Option[Context]
+  ): Either[ValidationError, OrderBookValidatedCommand] = {
+    val pbCmd = pbValidatedCommand.command
+    if (pbCmd.isPlaceLimitOrder)
+      for {
+        pbPlaceLimitOrder <- pbCmd.placeLimitOrder.toRight(GenericError("Place limit order is empty"))
+        pbOrder <- pbPlaceLimitOrder.order.toRight(GenericError("Order is empty"))
+        order <- readPbOrder(pbOrder)
+      } yield ValidatedCommand.PlaceOrder(
+        limitOrder = LimitOrder(
+          o = order,
+          percentMinFee = pbPlaceLimitOrder.percentMinFee.map(_.value),
+          percentConstMinFee = pbPlaceLimitOrder.percentConstMinFee.map(_.value)
+        ),
+        maybeCtx = maybeCtx
+      )
+    else if (pbCmd.isPlaceMarketOrder)
+      for {
+        pbPlaceMarketOrder <- pbCmd.placeMarketOrder.toRight(GenericError("Place market order is empty"))
+        pbOrder <- pbPlaceMarketOrder.order.toRight(GenericError("Order is empty"))
+        order <- readPbOrder(pbOrder)
+      } yield ValidatedCommand.PlaceMarketOrder(
+        marketOrder = MarketOrder(
+          o = order,
+          availableForSpending = pbPlaceMarketOrder.availableForSpending,
+          percentMinFee = pbPlaceMarketOrder.percentMinFee.map(_.value),
+          percentConstMinFee = pbPlaceMarketOrder.percentConstMinFee.map(_.value)
+        ),
+        maybeCtx = maybeCtx
+      )
+    else if (pbCmd.isCancelOrder)
+      for {
+        pbCancelOrder <- pbCmd.cancelOrder.toRight(GenericError("Cancel order is empty"))
+        orderId = pbCancelOrder.orderId.toByteArray
+        source <- pbCancelOrder.source match {
+          case PbCancelOrder.Source.NOT_TRACKED => Right(Source.NotTracked)
+          case PbCancelOrder.Source.REQUEST => Right(Source.Request)
+          case PbCancelOrder.Source.EXPIRATION => Right(Source.Expiration)
+          case PbCancelOrder.Source.BALANCE_TRACKING => Right(Source.BalanceTracking)
+          case PbCancelOrder.Source.Unrecognized(v) => Left(GenericError(s"Unknown source type: $v"))
+        }
+        owner <- {
+          if (pbCancelOrder.owner.isEmpty)
+            Right(Option.empty)
+          else
+            Address.fromBytes(pbCancelOrder.owner.toVanilla).map(_.some)
+        }
+      } yield ValidatedCommand.CancelOrder(assetPair, orderId, source, owner, maybeCtx)
+    else if (pbCmd.isDeleteOrderBook)
+      Right(ValidatedCommand.DeleteOrderBook(assetPair, maybeCtx))
+    else if (pbCmd.isCancelAllOrders)
+      Right(ValidatedCommand.CancelAllOrders(assetPair, maybeCtx))
+    else Left(GenericError(s"Command with asset pair $assetPair, but not one of them"))
+  }
 
   private def writeToPbOrder(order: Order): PbOrder =
     PbOrder(

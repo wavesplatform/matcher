@@ -30,7 +30,8 @@ import com.wavesplatform.dex.api.http.routes.v0._
 import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.app.MatcherStatus
-import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.caches.OrderFeeSettingsCache.CustomAssetFeeState
+import com.wavesplatform.dex.caches.{OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -54,6 +55,7 @@ import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus, _}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings.{CompositeSettings, DynamicSettings, PercentSettings}
 import com.wavesplatform.dex.settings.{AssetType, MatcherSettings, OrderFeeSettings, OrderRestrictionsSettings}
+import monix.execution.atomic.AtomicLong
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.{JsArray, JsString, Json, JsonFacade => _}
@@ -63,6 +65,7 @@ import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
+import scala.util.chaining._
 import scala.util.Random
 
 class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase with PathMockFactory with Eventually with WithDb {
@@ -74,6 +77,10 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       `X-Api-Key`.headerName,
       apiKeys(Random.nextInt(apiKeys.length))
     )
+
+  private val asset1: Asset = Asset.IssuedAsset(ByteStr.decodeBase58("DWgwcZTMhSvnyYCoWLRUXXSH1RSkzThXLJhww9gwkqdn").get)
+  private val asset2: Asset = Asset.IssuedAsset(ByteStr.decodeBase58("2GBgdhqMjUPqreqPziXvZFSmDiQVrxNuGxR1z7ZVsm4Z").get)
+  private val asset3: Asset = Asset.IssuedAsset(ByteStr.decodeBase58("Euz5HtYcj3nVTZxppA7wdabwTe5BzHFiu4QG1EJtzeUx").get)
 
   private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))
 
@@ -147,7 +154,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
   private val simpleCompositeSettings = CompositeSettings(
     default = DynamicSettings(baseMakerFee = 350000, baseTakerFee = 350000),
-    custom = Map(
+    customPairs = Map(
       assetPair1 -> PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000),
       assetPair2 -> PercentSettings(AssetType.Amount, minFee = 0.02, minFeeInWaves = 1000)
     )
@@ -155,7 +162,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
   private val complexCompositeSettings = CompositeSettings(
     default = DynamicSettings(baseMakerFee = 350000, baseTakerFee = 350000),
-    custom = Map(
+    customPairs = Map(
       assetPair1 -> PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000),
       assetPair2 -> PercentSettings(AssetType.Amount, minFee = 0.02, minFeeInWaves = 1000)
     ),
@@ -347,6 +354,152 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           )
         },
       feeSettings = complexCompositeSettings
+    )
+  }
+
+  routePath("/matcher/settings/custom-fee-assets") - {
+
+    "X-Api-Key is required for adding" in test(
+      route =>
+        Post(
+          routePath("/settings/custom-fee-assets"),
+          HttpCustomFeeAssets(Set(asset1, asset2))
+        ) ~> route ~> check {
+          status shouldEqual StatusCodes.Forbidden
+        },
+      apiKeys = apiKeys
+    )
+
+    "X-Api-Key is required for deleting" in test(
+      route =>
+        Delete(
+          routePath("/settings/custom-fee-assets"),
+          HttpCustomFeeAssets(Set(asset1, asset2))
+        ) ~> route ~> check {
+          status shouldEqual StatusCodes.Forbidden
+        },
+      apiKeys = apiKeys
+    )
+
+    "return OK when trying to new add assets" in test(
+      route =>
+        Post(
+          routePath("/settings/custom-fee-assets"),
+          HttpCustomFeeAssets(Set(asset1, asset2))
+        ).withHeaders(apiKeyHeader()) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          val resp = responseAs[HttpMessage]
+          resp.message.contains("Successfully saved command") shouldBe true
+          resp.message.contains("addCustomFeeAssets") shouldBe true
+          resp.message.contains(asset1.toString) shouldBe true
+          resp.message.contains(asset2.toString) shouldBe true
+        },
+      apiKeys = apiKeys
+    )
+
+    "return only new added assets" in test(
+      route =>
+        Post(
+          routePath("/settings/custom-fee-assets"),
+          HttpCustomFeeAssets(Set(asset2, asset3))
+        ).withHeaders(apiKeyHeader()) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          val resp = responseAs[HttpMessage]
+          resp.message.contains("Successfully saved command") shouldBe true
+          resp.message.contains("addCustomFeeAssets") shouldBe true
+          resp.message.contains(asset3.toString) shouldBe true
+          resp.message.contains(asset2.toString) shouldBe false
+          resp.message.contains(asset1.toString) shouldBe false
+        },
+      customAssetsFeeLastState = Set(asset1, asset2),
+      apiKeys = apiKeys
+    )
+
+    "return special message if no assets were added" in test(
+      route =>
+        Post(
+          routePath("/settings/custom-fee-assets"),
+          HttpCustomFeeAssets(Set(asset1, asset2))
+        ).withHeaders(apiKeyHeader()) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          val resp = responseAs[HttpMessage]
+          resp.message.contains("There is no assets to do") shouldBe true
+          resp.message.contains("addCustomFeeAssets") shouldBe true
+          resp.message.contains(asset3.toString) shouldBe false
+          resp.message.contains(asset2.toString) shouldBe false
+          resp.message.contains(asset1.toString) shouldBe false
+        },
+      customAssetsFeeLastState = Set(asset1, asset2),
+      apiKeys = apiKeys
+    )
+
+    "return special message if assets are empty" in test(
+      route =>
+        Post(
+          routePath("/settings/custom-fee-assets"),
+          HttpCustomFeeAssets(Set.empty)
+        ).withHeaders(apiKeyHeader()) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          val resp = responseAs[HttpMessage]
+          resp.message.contains("There is no assets to do") shouldBe true
+          resp.message.contains("addCustomFeeAssets") shouldBe true
+          resp.message.contains(asset3.toString) shouldBe false
+          resp.message.contains(asset2.toString) shouldBe false
+          resp.message.contains(asset1.toString) shouldBe false
+        },
+      apiKeys = apiKeys
+    )
+
+    "return message when trying to delete not existing assets" in test(
+      route =>
+        Delete(
+          routePath("/settings/custom-fee-assets"),
+          HttpCustomFeeAssets(Set(asset1))
+        ).withHeaders(apiKeyHeader()) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          val resp = responseAs[HttpMessage]
+          resp.message.contains("There is no assets to do") shouldBe true
+          resp.message.contains("deleteCustomFeeAssets") shouldBe true
+          resp.message.contains(asset1.toString) shouldBe false
+          resp.message.contains(asset2.toString) shouldBe false
+          resp.message.contains(asset3.toString) shouldBe false
+        },
+      apiKeys = apiKeys
+    )
+
+    "return message when trying to delete empty assets" in test(
+      route =>
+        Delete(
+          routePath("/settings/custom-fee-assets"),
+          HttpCustomFeeAssets(Set.empty)
+        ).withHeaders(apiKeyHeader()) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          val resp = responseAs[HttpMessage]
+          resp.message.contains("There is no assets to do") shouldBe true
+          resp.message.contains("deleteCustomFeeAssets") shouldBe true
+          resp.message.contains(asset1.toString) shouldBe false
+          resp.message.contains(asset2.toString) shouldBe false
+          resp.message.contains(asset3.toString) shouldBe false
+        },
+      apiKeys = apiKeys
+    )
+
+    "return assets that were deleted for success remove" in test(
+      route =>
+        Delete(
+          routePath("/settings/custom-fee-assets"),
+          HttpCustomFeeAssets(Set(asset1, asset3))
+        ).withHeaders(apiKeyHeader()) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          val resp = responseAs[HttpMessage]
+          resp.message.contains("Successfully saved command") shouldBe true
+          resp.message.contains("deleteCustomFeeAssets") shouldBe true
+          resp.message.contains(asset3.toString) shouldBe true
+          resp.message.contains(asset2.toString) shouldBe false
+          resp.message.contains(asset1.toString) shouldBe true
+        },
+      customAssetsFeeLastState = Set(asset1, asset2, asset3),
+      apiKeys = apiKeys
     )
   }
 
@@ -1342,7 +1495,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     f: Route => U,
     apiKeys: List[String] = List.empty,
     maybeRateCache: Option[RateCache] = None,
-    feeSettings: OrderFeeSettings = DynamicSettings.symmetric(matcherFee)
+    feeSettings: OrderFeeSettings = DynamicSettings.symmetric(matcherFee),
+    customAssetsFeeLastState: Set[Asset] = Set.empty
   ): U = {
     val rateCache = maybeRateCache.getOrElse(RateCache(TestRateDb()).futureValue)
 
@@ -1352,129 +1506,11 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     val apdb = AssetPairsDb.levelDb(asyncLevelDb)
     apdb.add(blackListedOrder.assetPair)
 
-    val addressActor = TestProbe("address")
-    addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
-      val response = msg match {
-        case AddressDirectoryActor.Command.ForwardMessage(forwardAddress, msg) =>
-          msg match {
-            case AddressActor.Query.GetReservedBalance => AddressActor.Reply.GetBalance(Map(Waves -> 350L))
-            case PlaceOrder(x, _) =>
-              if (x.order.id() == okOrder.id()) AddressActor.Event.OrderAccepted(x.order) else error.OrderDuplicate(x.order.id())
+    val addressActor = mkAddressActorTestProbe(odb)
 
-            case AddressActor.Query.GetOrdersStatuses(_, _) =>
-              AddressActor.Reply.GetOrderStatuses(List(okOrder.id() -> OrderInfo.v5(LimitOrder(okOrder, None, None), OrderStatus.Accepted)))
+    val orderBookDirectoryActor = mkOrderBookDirectoryActorTestProbe()
 
-            case AddressActor.Query.GetOrderStatus(orderId) =>
-              if (orderId == okOrder.id()) AddressActor.Reply.GetOrderStatus(OrderStatus.Accepted)
-              else Status.Failure(new RuntimeException(s"Unknown order $orderId"))
-
-            case AddressActor.Command.CancelOrder(orderId, Source.Request) =>
-              def handleCancelOrder() =
-                if (orderId == okOrder.id() || orderId == orderToCancel.id()) AddressActor.Event.OrderCanceled(orderId)
-                else error.OrderNotFound(orderId)
-
-              odb.get(orderId).futureValue match {
-                case None => handleCancelOrder()
-                case Some(order) if order.sender.toAddress == forwardAddress => handleCancelOrder()
-                case _ => error.OrderNotFound(orderId)
-              }
-
-            case x @ AddressActor.Command.CancelAllOrders(pair, _, Source.Request) =>
-              if (pair.contains(badOrder.assetPair)) error.AddressIsBlacklisted(badOrder.sender)
-              else if (pair.forall(_ == okOrder.assetPair))
-                AddressActor.Event.BatchCancelCompleted(
-                  Map(
-                    okOrder.id() -> Right(AddressActor.Event.OrderCanceled(okOrder.id())),
-                    badOrder.id() -> Left(error.CanNotPersistEvent)
-                  )
-                )
-              else Status.Failure(new RuntimeException(s"Can't handle $x"))
-
-            case AddressActor.Command.CancelOrders(ids, Source.Request) =>
-              AddressActor.Event.BatchCancelCompleted(
-                ids.map { id =>
-                  id -> (if (id == orderToCancel.id()) Right(AddressActor.Event.OrderCanceled(okOrder.id())) else Left(error.CanNotPersistEvent))
-                }.toMap
-              )
-
-            case GetTradableBalance(xs) => AddressActor.Reply.GetBalance(xs.map(_ -> 100L).toMap)
-
-            case _: AddressActor.Query.GetOrderStatusInfo =>
-              AddressActor.Reply.GetOrdersStatusInfo(OrderInfo.v5(LimitOrder(orderToCancel, None, None), OrderStatus.Accepted).some)
-
-            case x => Status.Failure(new RuntimeException(s"Unknown command: $x"))
-          }
-
-        case x => Status.Failure(new RuntimeException(s"Unknown message: $x"))
-      }
-
-      sender ! response
-      TestActor.KeepRunning
-    }
-
-    val orderBookDirectoryActor = TestProbe("matcher")
-    orderBookDirectoryActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
-      msg match {
-        case GetSnapshotOffsets =>
-          sender ! SnapshotOffsetsResponse(
-            Map(
-              AssetPair(Waves, priceAsset) -> Some(100L),
-              smartWavesPair -> Some(120L),
-              AssetPair(smartAsset, priceAsset) -> None
-            )
-          )
-
-        case GetMarkets =>
-          sender ! List(
-            MarketData(
-              pair = okOrder.assetPair,
-              amountAssetName = amountAssetDesc.name,
-              priceAssetName = priceAssetDesc.name,
-              created = System.currentTimeMillis(),
-              amountAssetInfo = Some(AssetInfo(amountAssetDesc.decimals)),
-              priceAssetInfo = Some(AssetInfo(priceAssetDesc.decimals))
-            )
-          )
-        case _ =>
-      }
-
-      TestActor.KeepRunning
-    }
-
-    val orderBookActor = TestProbe("orderBook")
-    orderBookActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
-      msg match {
-        case request: AggregatedOrderBookActor.Query.GetHttpView =>
-          val assetPairDecimals = request.format match {
-            case Denormalized => Some(smartAssetDesc.decimals -> 8)
-            case _ => None
-          }
-
-          val entity =
-            HttpOrderBook(
-              0L,
-              smartWavesPair,
-              smartWavesAggregatedSnapshot.bids,
-              smartWavesAggregatedSnapshot.asks,
-              assetPairDecimals
-            )
-
-          val httpResponse =
-            HttpResponse(
-              entity = HttpEntity(
-                ContentTypes.`application/json`,
-                HttpOrderBook.toJson(entity)
-              )
-            )
-
-          request.client ! httpResponse
-
-        case request: AggregatedOrderBookActor.Query.GetMarketStatus => request.client ! smartWavesMarketStatus
-        case _ =>
-      }
-
-      TestActor.KeepRunning
-    }
+    val orderBookActor = mkOrderBookActorTestProbe()
 
     val exchangeTxStorage = ExchangeTxStorage.levelDB(asyncLevelDb)
     exchangeTxStorage.put(
@@ -1508,30 +1544,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           else liftFutureAsync(Future.failed(new IllegalArgumentException(s"No information about $x")))
       )
 
-    val blacklistedAssets =
-      Set(blackListedOrder.assetPair.amountAsset, blackListedOrder.assetPair.priceAsset).foldLeft(Set.empty[IssuedAsset]) { (acc, elem) =>
-        elem match {
-          case asset: IssuedAsset => acc + asset
-          case Asset.Waves => acc
-        }
-      }
-    val blacklistedPriceAsset = blackListedOrder.assetPair.priceAsset match {
-      case priceAsset: IssuedAsset => Some(priceAsset)
-      case Asset.Waves => None
-    }
-    val pairBuilder = new AssetPairBuilder(
-      settings,
-      {
-        case `smartAsset` => liftValueAsync[BriefAssetDescription](smartAssetDesc)
-        case x
-            if x == okOrder.assetPair.amountAsset || x == badOrder.assetPair.amountAsset || x == unknownAsset || x == blackListedOrder.assetPair.amountAsset =>
-          liftValueAsync[BriefAssetDescription](amountAssetDesc)
-        case x if x == okOrder.assetPair.priceAsset || x == badOrder.assetPair.priceAsset || blacklistedPriceAsset.contains(x) =>
-          liftValueAsync[BriefAssetDescription](priceAssetDesc)
-        case x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
-      },
-      blacklistedAssets
-    )
+    val pairBuilder = mkAssetPairBuilder()
 
     val placeRoute = new PlaceRoute(
       settings.actorResponseTimeout,
@@ -1614,6 +1627,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       () => MatcherStatus.Working,
       apiKeys map crypto.secureHash
     )
+
+    val atomicLong = AtomicLong(0L)
+    val feeSettingsCache = new OrderFeeSettingsCache(Map(0L -> feeSettings), CustomAssetFeeState(Map(0L -> customAssetsFeeLastState)))
     val infoRoute = new MatcherInfoRoute(
       matcherKeyPair.publicKey,
       settings,
@@ -1622,8 +1638,17 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       apiKeys map crypto.secureHash,
       rateCache,
       () => Future.successful(Set(1, 2, 3)),
-      () => feeSettings,
+      () => feeSettingsCache.getSettingsForOffset(1L),
       () => -1L
+    )
+
+    val feeAssetsRoute = new CustomAssetsFeeRoute(
+      apiKeys map crypto.secureHash,
+      feeSettingsCache,
+      cmd => {
+        val offset = atomicLong.incrementAndGet()
+        Future.successful(Some(ValidatedCommandWithMeta(offset = offset, timestamp = System.currentTimeMillis(), cmd)))
+      }
     )
 
     val routes = Seq(
@@ -1635,10 +1660,170 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       placeRoute.route,
       cancelRoute.route,
       balancesRoute.route,
-      transactionsRoute.route
+      transactionsRoute.route,
+      feeAssetsRoute.route
     )
 
     f(concat(routes: _*))
   }
+
+  private def mkAssetPairBuilder() = {
+    val blacklistedAssets =
+      Set(blackListedOrder.assetPair.amountAsset, blackListedOrder.assetPair.priceAsset).foldLeft(Set.empty[IssuedAsset]) { (acc, elem) =>
+        elem match {
+          case asset: IssuedAsset => acc + asset
+          case Asset.Waves => acc
+        }
+      }
+    val blacklistedPriceAsset = blackListedOrder.assetPair.priceAsset match {
+      case priceAsset: IssuedAsset => Some(priceAsset)
+      case Asset.Waves => None
+    }
+
+    new AssetPairBuilder(
+      settings,
+      {
+        case `smartAsset` => liftValueAsync[BriefAssetDescription](smartAssetDesc)
+        case x
+            if x == okOrder.assetPair.amountAsset || x == badOrder.assetPair.amountAsset || x == unknownAsset || x == blackListedOrder.assetPair.amountAsset =>
+          liftValueAsync[BriefAssetDescription](amountAssetDesc)
+        case x if x == okOrder.assetPair.priceAsset || x == badOrder.assetPair.priceAsset || blacklistedPriceAsset.contains(x) =>
+          liftValueAsync[BriefAssetDescription](priceAssetDesc)
+        case x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
+      },
+      blacklistedAssets
+    )
+  }
+
+  private def mkOrderBookActorTestProbe() =
+    TestProbe("orderBook").tap {
+      _.setAutoPilot { (_: ActorRef, msg: Any) =>
+        msg match {
+          case request: AggregatedOrderBookActor.Query.GetHttpView =>
+            val assetPairDecimals = request.format match {
+              case Denormalized => Some(smartAssetDesc.decimals -> 8)
+              case _ => None
+            }
+
+            val entity =
+              HttpOrderBook(
+                0L,
+                smartWavesPair,
+                smartWavesAggregatedSnapshot.bids,
+                smartWavesAggregatedSnapshot.asks,
+                assetPairDecimals
+              )
+
+            val httpResponse =
+              HttpResponse(
+                entity = HttpEntity(
+                  ContentTypes.`application/json`,
+                  HttpOrderBook.toJson(entity)
+                )
+              )
+
+            request.client ! httpResponse
+
+          case request: AggregatedOrderBookActor.Query.GetMarketStatus => request.client ! smartWavesMarketStatus
+          case _ =>
+        }
+
+        TestActor.KeepRunning
+      }
+    }
+
+  private def mkOrderBookDirectoryActorTestProbe() =
+    TestProbe("matcher").tap {
+      _.setAutoPilot { (sender: ActorRef, msg: Any) =>
+        msg match {
+          case GetSnapshotOffsets =>
+            sender ! SnapshotOffsetsResponse(
+              Map(
+                AssetPair(Waves, priceAsset) -> Some(100L),
+                smartWavesPair -> Some(120L),
+                AssetPair(smartAsset, priceAsset) -> None
+              )
+            )
+
+          case GetMarkets =>
+            sender ! List(
+              MarketData(
+                pair = okOrder.assetPair,
+                amountAssetName = amountAssetDesc.name,
+                priceAssetName = priceAssetDesc.name,
+                created = System.currentTimeMillis(),
+                amountAssetInfo = Some(AssetInfo(amountAssetDesc.decimals)),
+                priceAssetInfo = Some(AssetInfo(priceAssetDesc.decimals))
+              )
+            )
+          case _ =>
+        }
+
+        TestActor.KeepRunning
+      }
+    }
+
+  private def mkAddressActorTestProbe(odb: OrderDb[Future]) =
+    TestProbe("address").tap {
+      _.setAutoPilot { (sender: ActorRef, msg: Any) =>
+        val response = msg match {
+          case AddressDirectoryActor.Command.ForwardMessage(forwardAddress, msg) =>
+            msg match {
+              case AddressActor.Query.GetReservedBalance => AddressActor.Reply.GetBalance(Map(Waves -> 350L))
+              case PlaceOrder(x, _) =>
+                if (x.order.id() == okOrder.id()) AddressActor.Event.OrderAccepted(x.order) else error.OrderDuplicate(x.order.id())
+
+              case AddressActor.Query.GetOrdersStatuses(_, _) =>
+                AddressActor.Reply.GetOrderStatuses(List(okOrder.id() -> OrderInfo.v5(LimitOrder(okOrder, None, None), OrderStatus.Accepted)))
+
+              case AddressActor.Query.GetOrderStatus(orderId) =>
+                if (orderId == okOrder.id()) AddressActor.Reply.GetOrderStatus(OrderStatus.Accepted)
+                else Status.Failure(new RuntimeException(s"Unknown order $orderId"))
+
+              case AddressActor.Command.CancelOrder(orderId, Source.Request) =>
+                def handleCancelOrder() =
+                  if (orderId == okOrder.id() || orderId == orderToCancel.id()) AddressActor.Event.OrderCanceled(orderId)
+                  else error.OrderNotFound(orderId)
+
+                odb.get(orderId).futureValue match {
+                  case None => handleCancelOrder()
+                  case Some(order) if order.sender.toAddress == forwardAddress => handleCancelOrder()
+                  case _ => error.OrderNotFound(orderId)
+                }
+
+              case x @ AddressActor.Command.CancelAllOrders(pair, _, Source.Request) =>
+                if (pair.contains(badOrder.assetPair)) error.AddressIsBlacklisted(badOrder.sender)
+                else if (pair.forall(_ == okOrder.assetPair))
+                  AddressActor.Event.BatchCancelCompleted(
+                    Map(
+                      okOrder.id() -> Right(AddressActor.Event.OrderCanceled(okOrder.id())),
+                      badOrder.id() -> Left(error.CanNotPersistEvent)
+                    )
+                  )
+                else Status.Failure(new RuntimeException(s"Can't handle $x"))
+
+              case AddressActor.Command.CancelOrders(ids, Source.Request) =>
+                AddressActor.Event.BatchCancelCompleted(
+                  ids.map { id =>
+                    id -> (if (id == orderToCancel.id()) Right(AddressActor.Event.OrderCanceled(okOrder.id()))
+                           else Left(error.CanNotPersistEvent))
+                  }.toMap
+                )
+
+              case GetTradableBalance(xs) => AddressActor.Reply.GetBalance(xs.map(_ -> 100L).toMap)
+
+              case _: AddressActor.Query.GetOrderStatusInfo =>
+                AddressActor.Reply.GetOrdersStatusInfo(OrderInfo.v5(LimitOrder(orderToCancel, None, None), OrderStatus.Accepted).some)
+
+              case x => Status.Failure(new RuntimeException(s"Unknown command: $x"))
+            }
+
+          case x => Status.Failure(new RuntimeException(s"Unknown message: $x"))
+        }
+
+        sender ! response
+        TestActor.KeepRunning
+      }
+    }
 
 }

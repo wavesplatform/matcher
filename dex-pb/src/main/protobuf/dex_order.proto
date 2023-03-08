@@ -67,6 +67,14 @@ message CancelOrder {
     bytes owner = 3;
 };
 
+message AddFeeCustomAssets {
+    repeated bytes asset_id = 1;
+};
+
+message DeleteFeeCustomAssets {
+    repeated bytes asset_id = 1;
+};
+
 message ValidatedCommand {
     AssetPair asset_pair = 1;
     bytes kamon_ctx = 2;
@@ -76,5 +84,7 @@ message ValidatedCommand {
         CancelOrder cancel_order = 5;
         google.protobuf.Empty cancel_all_orders = 6;
         google.protobuf.Empty delete_order_book = 7;
+        AddFeeCustomAssets add_fee_custom_assets = 8;
+        DeleteFeeCustomAssets delete_fee_custom_assets = 9;
     }
 };

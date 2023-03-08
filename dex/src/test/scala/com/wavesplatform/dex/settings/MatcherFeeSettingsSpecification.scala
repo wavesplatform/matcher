@@ -36,7 +36,7 @@ final class MatcherFeeSettingsSpecification extends BaseSettingsSpecification wi
        |  5: {
        |    mode = composite
        |    composite {
-       |        custom {
+       |        custom-pairs {
        |          $asset1-WAVES {
        |            mode = "percent"
        |            percent {
@@ -204,7 +204,7 @@ final class MatcherFeeSettingsSpecification extends BaseSettingsSpecification wi
     ).settingsMap.keySet
 
     compositeSettings.default shouldBe DynamicSettings(baseMakerFee = 350000, baseTakerFee = 350000)
-    compositeSettings.custom shouldBe Map(
+    compositeSettings.customPairs shouldBe Map(
       assetPair1Waves -> PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000),
       assetPair2Waves -> PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000)
     )
